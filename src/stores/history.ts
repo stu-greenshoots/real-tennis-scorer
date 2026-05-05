@@ -83,7 +83,44 @@ export const useHistoryStore = defineStore('history', () => {
   }
 
   function exportAllJson(): string {
-    return JSON.stringify(matches.value, null, 2)
+    return JSON.stringify({ version: 1, matches: matches.value }, null, 2)
+  }
+
+  /**
+   * Import matches from a JSON string. Accepts either:
+   *  - the full export shape `{ version, matches: [...] }`
+   *  - a bare array of matches
+   *  - a single match object
+   * Merges by id (existing entries are replaced). Returns counts.
+   */
+  function importJson(raw: string): { added: number; skipped: number } {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      return { added: 0, skipped: 0 }
+    }
+    let incoming: unknown[]
+    if (Array.isArray(parsed)) {
+      incoming = parsed
+    } else if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { matches?: unknown }).matches)) {
+      incoming = (parsed as { matches: unknown[] }).matches
+    } else if (parsed && typeof parsed === 'object') {
+      incoming = [parsed]
+    } else {
+      return { added: 0, skipped: 0 }
+    }
+    let added = 0
+    let skipped = 0
+    for (const item of incoming) {
+      if (isMatchShape(item)) {
+        add(item)
+        added++
+      } else {
+        skipped++
+      }
+    }
+    return { added, skipped }
   }
 
   return {
@@ -95,5 +132,6 @@ export const useHistoryStore = defineStore('history', () => {
     clear,
     exportJson,
     exportAllJson,
+    importJson,
   }
 })

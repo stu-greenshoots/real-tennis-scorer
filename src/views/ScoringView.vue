@@ -63,6 +63,13 @@ function endMatch() {
   router.push('/')
 }
 
+function dismissWinner() {
+  const id = match.value?.id
+  matchStore.clear()
+  if (id) router.replace(`/match/${id}`)
+  else router.replace('/')
+}
+
 const chaseBadge = computed(() => {
   const n = match.value?.pendingChases.length ?? 0
   if (n === 0) return null
@@ -166,6 +173,18 @@ function pressLabel(side: Side): string {
       @cancel="showChasePicker = false"
     />
 
+    <div v-if="match.winner" class="modal-backdrop winner-backdrop">
+      <div class="modal-sheet winner-sheet">
+        <div class="winner-trophy">🏆</div>
+        <h2 class="winner-title">{{ match.players[match.winner] }} wins!</h2>
+        <div class="winner-score">
+          {{ match.score.setHistory.map((s) => `${s.A}–${s.B}`).join(', ') || `${match.score.sets.A}–${match.score.sets.B} sets` }}
+        </div>
+        <button class="btn btn-primary btn-block" @click="dismissWinner">View timeline</button>
+        <button class="btn btn-ghost btn-block" @click="matchStore.clear(); router.replace('/')">Home</button>
+      </div>
+    </div>
+
     <div v-if="showEndConfirm" class="modal-backdrop" @click.self="showEndConfirm = false">
       <div class="modal-sheet">
         <h3>End the match?</h3>
@@ -217,4 +236,9 @@ function pressLabel(side: Side): string {
   gap: 0.5rem;
 }
 .btn-small { min-height: 36px; padding: 0.3rem 0.7rem; font-size: 0.9rem; }
+.winner-backdrop { z-index: 50; }
+.winner-sheet { text-align: center; }
+.winner-trophy { font-size: 4rem; line-height: 1; margin-bottom: 0.5rem; }
+.winner-title { font-size: 1.6rem; margin-bottom: 0.5rem; color: var(--primary); }
+.winner-score { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 1rem; font-variant-numeric: tabular-nums; }
 </style>

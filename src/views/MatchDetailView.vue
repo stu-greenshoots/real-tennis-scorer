@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Timeline from '../components/Timeline.vue'
 import { useHistoryStore } from '../stores/history'
@@ -9,6 +9,30 @@ const props = defineProps<{ id: string }>()
 const router = useRouter()
 const historyStore = useHistoryStore()
 const matchStore = useMatchStore()
+
+const showDeleteConfirm = ref(false)
+
+function exportThis() {
+  const m = match.value
+  if (!m) return
+  const json = historyStore.exportJson(m.id) || JSON.stringify(m, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const stamp = new Date(m.startedAt).toISOString().slice(0, 10)
+  a.href = url
+  a.download = `match-${m.players.A}-vs-${m.players.B}-${stamp}.json`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+function confirmDelete() {
+  if (match.value) historyStore.delete(match.value.id)
+  showDeleteConfirm.value = false
+  router.replace('/history')
+}
 
 const match = computed(() => {
   // Prefer history; fall back to current in-memory match
@@ -63,8 +87,24 @@ function finalScore(m: NonNullable<typeof match.value>): string {
       <div class="score">{{ finalScore(match) }}</div>
     </div>
 
+    <div class="detail-actions">
+      <button class="btn btn-small" @click="exportThis">Export JSON</button>
+      <button class="btn btn-small btn-danger" @click="showDeleteConfirm = true">Delete</button>
+    </div>
+
     <h2>Timeline</h2>
     <Timeline :events="match.events" :players="match.players" />
+
+    <div v-if="showDeleteConfirm" class="modal-backdrop" @click.self="showDeleteConfirm = false">
+      <div class="modal-sheet">
+        <h3>Delete this match?</h3>
+        <p class="muted">Export a backup first if you want to keep it.</p>
+        <div class="row" style="gap: 0.5rem; margin-top: 0.75rem;">
+          <button class="btn btn-block" @click="showDeleteConfirm = false">Cancel</button>
+          <button class="btn btn-danger btn-block" @click="confirmDelete">Delete</button>
+        </div>
+      </div>
+    </div>
   </div>
   <div v-else class="view center muted">
     Match not found.
@@ -85,4 +125,10 @@ function finalScore(m: NonNullable<typeof match.value>): string {
   color: var(--primary);
   font-variant-numeric: tabular-nums;
 }
+.detail-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.detail-actions .btn { flex: 1; }
+.btn-small { min-height: 36px; padding: 0.3rem 0.7rem; font-size: 0.9rem; }
 </style>
