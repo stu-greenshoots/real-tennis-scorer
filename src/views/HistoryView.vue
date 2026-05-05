@@ -127,7 +127,7 @@ async function onFileChosen(ev: Event) {
       <img :src="`${baseUrl}scenes/paul-shrug.png`" alt="No matches yet" />
       <h2>No matches yet —<br />let's play!</h2>
       <p class="muted small">Once you've finished a match it'll show up here, with every chase, dedans and gallery on the timeline.</p>
-      <button class="btn btn-primary btn-lg btn-block" @click="router.push('/setup')">Start a match</button>
+      <button class="btn btn-primary big-cta" @click="router.push('/setup')">Start a match</button>
     </div>
 
     <ul v-else class="match-list">
@@ -230,4 +230,12 @@ async function onFileChosen(ev: Event) {
   color: var(--text);
 }
 .empty-state p { max-width: 280px; }
+.big-cta {
+  width: 100%;
+  max-width: 360px;
+  height: 76px;
+  font-size: 1.25rem;
+  border-radius: 22px;
+  margin-top: 0.5rem;
+}
 </style>

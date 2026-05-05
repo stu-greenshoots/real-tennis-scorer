@@ -28,16 +28,16 @@ const baseUrl = import.meta.env.BASE_URL
       </div>
 
       <div class="actions">
-        <button v-if="canResume" class="btn btn-primary btn-lg btn-block" @click="router.push('/match')">
+        <button v-if="canResume" class="btn btn-primary big-btn" @click="router.push('/match')">
           Resume match
         </button>
-        <button class="btn btn-lg btn-block" :class="canResume ? '' : 'btn-primary'" @click="router.push('/setup')">
-          <Glyphs glyph="racquet" :size="18" />
+        <button class="btn big-btn" :class="canResume ? '' : 'btn-primary'" @click="router.push('/setup')">
+          <Glyphs glyph="racquet" :size="22" />
           New match
         </button>
-        <button class="btn btn-block" @click="router.push('/history')">
+        <button class="btn big-btn" @click="router.push('/history')">
           History
-          <span v-if="historyStore.matches.length" class="badge">{{ historyStore.matches.length }}</span>
+          <span v-if="historyStore.matches.length" class="badge big-badge">{{ historyStore.matches.length }}</span>
         </button>
       </div>
     </div>
@@ -77,10 +77,21 @@ const baseUrl = import.meta.env.BASE_URL
   color: var(--text);
   text-align: center;
 }
-.actions { display: flex; flex-direction: column; gap: 0.6rem; }
+.actions { display: flex; flex-direction: column; gap: 0.7rem; }
+.big-btn {
+  width: 100%;
+  height: 76px;
+  font-size: 1.25rem;
+  border-radius: 22px;
+}
+.big-btn :deep(svg) { width: 24px; height: 24px; }
 .actions .badge {
   margin-left: auto;
   background: var(--primary);
   color: var(--primary-contrast);
+}
+.big-badge {
+  font-size: 0.95rem;
+  padding: 0.3rem 0.75rem;
 }
 </style>
