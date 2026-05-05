@@ -93,7 +93,7 @@ function finalScore(m: NonNullable<typeof match.value>): string {
     </div>
 
     <h2>Timeline</h2>
-    <Timeline :events="match.events" :players="match.players" />
+    <Timeline :events="match.events" :players="match.players" :match="match" />
 
     <div v-if="showDeleteConfirm" class="modal-backdrop" @click.self="showDeleteConfirm = false">
       <div class="modal-sheet">

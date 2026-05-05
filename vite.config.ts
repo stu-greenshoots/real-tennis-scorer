@@ -9,13 +9,13 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icons/192.png', 'icons/512.png', 'icons/maskable.png'],
+      includeAssets: ['favicon.png', 'icons/192.png', 'icons/512.png', 'icons/maskable.png', 'portraits/*.png', 'scenes/*.png'],
       manifest: {
         name: "Paul's Real Tennis Scorer",
         short_name: "Paul's Tennis",
         description: 'Phone-first PWA for scoring real tennis matches between two players, with chase tracking and end-switching.',
-        theme_color: '#6b1f1f',
-        background_color: '#f7f1e6',
+        theme_color: '#5c1820',
+        background_color: '#efe4cf',
         display: 'standalone',
         orientation: 'portrait',
         categories: ['sports', 'utilities'],

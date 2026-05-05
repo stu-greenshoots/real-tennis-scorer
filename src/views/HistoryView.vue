@@ -7,6 +7,7 @@ import type { Match } from '../scoring/types'
 const router = useRouter()
 const historyStore = useHistoryStore()
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
+const baseUrl = import.meta.env.BASE_URL
 
 const matches = computed(() => {
   const list = [...historyStore.matches]
@@ -122,8 +123,11 @@ async function onFileChosen(ev: Event) {
     </div>
     <div v-if="importMessage" class="import-toast muted small">{{ importMessage }}</div>
 
-    <div v-if="matches.length === 0" class="card center muted">
-      No matches yet.
+    <div v-if="matches.length === 0" class="empty-state">
+      <img :src="`${baseUrl}scenes/paul-shrug.png`" alt="No matches yet" />
+      <h2>No matches yet —<br />let's play!</h2>
+      <p class="muted small">Once you've finished a match it'll show up here, with every chase, dedans and gallery on the timeline.</p>
+      <button class="btn btn-primary btn-lg btn-block" @click="router.push('/setup')">Start a match</button>
     </div>
 
     <ul v-else class="match-list">
@@ -205,6 +209,25 @@ async function onFileChosen(ev: Event) {
 .delete-btn {
   font-size: 1.1rem;
   padding: 0.25rem 0.5rem;
-  min-height: 32px;
+  height: 32px;
 }
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.75rem;
+  padding: 1.5rem 0.5rem;
+}
+.empty-state img {
+  width: min(60%, 220px);
+  height: auto;
+  filter: drop-shadow(0 4px 16px rgba(60,30,15,0.18));
+}
+.empty-state h2 {
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--text);
+}
+.empty-state p { max-width: 280px; }
 </style>

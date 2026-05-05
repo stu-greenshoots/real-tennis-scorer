@@ -67,6 +67,8 @@ export interface Match {
   events: PointEvent[]
   score: ScoreSnapshot
   winner?: Side
+  /** Optional avatar IDs (from src/lib/roster.ts) for visual personalisation. */
+  avatars?: { A?: string; B?: string }
 }
 
 export type Action =

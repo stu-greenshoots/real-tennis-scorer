@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { PointEvent, GamePoints } from '../scoring/types'
+import type { PointEvent, GamePoints, Match } from '../scoring/types'
+import Portrait from './Portrait.vue'
+import GlyphDivider from './GlyphDivider.vue'
+import Glyphs from './Glyphs.vue'
+import { PAUL, OPPONENT_AVATARS } from '../lib/roster'
 
 const props = defineProps<{
   events: PointEvent[]
   players: { A: string; B: string }
+  match?: Match
 }>()
 
 function fmtPoints(p: GamePoints): string {
@@ -16,27 +21,37 @@ function tagLabel(tag?: string): string {
   return tag.replace(/-/g, ' ')
 }
 
+const avatarA = computed(() => PAUL)
+const avatarB = computed(() => {
+  const id = props.match?.avatars?.B
+  return OPPONENT_AVATARS.find((o) => o.id === id) ??
+    { id: 'opponent', bg: 'var(--accent)', silhouette: 'glasses' as const }
+})
+
 interface Group {
   setIndex: number
   gameIndex: number
   label: string
+  glyph: 'penthouse' | 'dedans' | 'grille' | 'tambour' | 'racquet'
   events: PointEvent[]
 }
 
-// Group consecutive events by (setIndex, gameIndex) derived from scoreAfter.
+const GLYPH_ORDER: Group['glyph'][] = ['penthouse', 'dedans', 'grille', 'tambour', 'racquet']
+
 const groups = computed<Group[]>(() => {
   const out: Group[] = []
   let lastKey = ''
   for (const ev of props.events) {
     const sa = ev.scoreAfter
-    const setIndex = (sa?.setHistory?.length ?? 0) + 1 // current set number
+    const setIndex = (sa?.setHistory?.length ?? 0) + 1
     const gameIndex = (sa?.games?.A ?? 0) + (sa?.games?.B ?? 0) + 1
     const key = `${setIndex}-${gameIndex}`
     if (key !== lastKey) {
       out.push({
         setIndex,
         gameIndex,
-        label: `Set ${setIndex}, Game ${gameIndex}`,
+        label: `Set ${setIndex} · Game ${gameIndex}`,
+        glyph: GLYPH_ORDER[out.length % GLYPH_ORDER.length],
         events: [],
       })
       lastKey = key
@@ -46,34 +61,45 @@ const groups = computed<Group[]>(() => {
   return out
 })
 
-function describe(ev: PointEvent): string {
-  if (ev.chaseLaid) {
-    return `Chase laid: ${ev.chaseLaid.replace(/-/g, ' ')}`
-  }
-  if (ev.winner) {
-    const name = props.players[ev.winner]
-    const points = ev.scoreAfter?.points
-    const ptStr = points
-      ? `${fmtPoints(points.A)}-${fmtPoints(points.B)}`
-      : ''
-    const tag = ev.tag ? ` (${tagLabel(ev.tag)})` : ''
-    return `${name} ${ptStr}${tag}`
-  }
+function tagBadge(ev: PointEvent): string {
+  if (ev.chaseLaid) return `Chase ${String(ev.chaseLaid).replace(/-/g, ' ')}`
+  if (ev.tag) return tagLabel(ev.tag)
+  if (ev.endsSwitchedAfter) return 'Ends switched'
   if (ev.note) return ev.note
-  return 'Event'
+  return ''
 }
 </script>
 
 <template>
   <div class="timeline">
-    <div v-if="!events.length" class="muted center">No events yet.</div>
+    <div v-if="!events.length" class="muted center" style="padding: 1rem;">No events yet.</div>
     <div v-for="g in groups" :key="`${g.setIndex}-${g.gameIndex}`" class="timeline-group">
-      <div class="group-label muted">{{ g.label }}</div>
+      <GlyphDivider :glyph="g.glyph" :label="g.label" />
       <ul class="events">
         <li v-for="ev in g.events" :key="ev.id" class="event">
-          <span class="bullet" :class="{ a: ev.winner === 'A', b: ev.winner === 'B' }"></span>
-          <span class="desc">{{ describe(ev) }}</span>
-          <span v-if="ev.endsSwitchedAfter" class="badge ends">Ends switched</span>
+          <Portrait
+            v-if="ev.winner === 'A'"
+            v-bind="avatarA"
+            :size="36"
+          />
+          <Portrait
+            v-else-if="ev.winner === 'B'"
+            v-bind="avatarB"
+            :size="36"
+          />
+          <div v-else class="event-marker">
+            <Glyphs :glyph="ev.chaseLaid ? 'penthouse' : 'ball'" :size="22" color="var(--text-muted)" />
+          </div>
+          <div class="event-text">
+            <div class="event-line">
+              <span v-if="ev.scoreAfter" class="score">
+                {{ fmtPoints(ev.scoreAfter.points.A) }}–{{ fmtPoints(ev.scoreAfter.points.B) }}
+              </span>
+              <span class="tag">{{ tagBadge(ev) }}</span>
+            </div>
+            <div v-if="ev.winner" class="event-sub">{{ players[ev.winner] }}</div>
+            <div v-else-if="ev.note" class="event-sub muted">{{ ev.note }}</div>
+          </div>
         </li>
       </ul>
     </div>
@@ -81,49 +107,47 @@ function describe(ev: PointEvent): string {
 </template>
 
 <style scoped>
-.timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-.timeline-group {
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  padding: 0.6rem 0.8rem;
-}
-.group-label {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.25rem;
-}
+.timeline { display: flex; flex-direction: column; gap: 0.5rem; }
+.timeline-group { padding: 0; }
 .events {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
 }
 .event {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0;
-  border-bottom: 1px dashed var(--border);
-  font-size: 0.95rem;
+  gap: 0.6rem;
+  padding: 0.45rem 0.25rem;
+  border-bottom: 1px solid var(--line);
 }
 .event:last-child { border-bottom: none; }
-.bullet {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-muted);
+.event-marker {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--surface-sunken);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
-.bullet.a { background: var(--primary); }
-.bullet.b { background: var(--accent); }
-.desc { flex: 1; }
-.ends { font-size: 0.75rem; }
+.event-text { flex: 1; min-width: 0; }
+.event-line { display: flex; gap: 0.4rem; align-items: baseline; }
+.score {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--text);
+}
+.tag {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.event-sub { font-size: 0.7rem; color: var(--text-faint); }
 </style>

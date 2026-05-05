@@ -70,8 +70,13 @@ export const useMatchStore = defineStore('match', () => {
 
   const hasActiveMatch = computed(() => !!current.value && !current.value.endedAt)
 
-  function start(players: { A: string; B: string }, config: MatchConfig): void {
-    current.value = createMatch({ players, config })
+  function start(
+    players: { A: string; B: string },
+    config: MatchConfig,
+    avatars?: { A?: string; B?: string },
+  ): void {
+    const match = createMatch({ players, config })
+    current.value = avatars ? { ...match, avatars } : match
   }
 
   function dispatch(action: Action): void {
