@@ -52,36 +52,44 @@ const baseUrl = import.meta.env.BASE_URL
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 1.25rem;
-  gap: 1rem;
+  padding: 1rem 1.25rem;
+  gap: 0.75rem;
   justify-content: space-between;
+  overflow: hidden;
+  min-height: 0;
 }
 .hero {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 0.5rem;
-  padding-top: 1rem;
+  gap: 0.4rem;
+  flex: 1 1 0;
+  min-height: 0;
+  justify-content: center;
 }
 .hero-img {
-  width: min(70%, 280px);
-  height: auto;
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 100%;
+  width: auto;
+  max-width: min(60%, 220px);
+  object-fit: contain;
   filter: drop-shadow(0 8px 24px rgba(60,30,15,0.18));
 }
-.hero-text { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; }
+.hero-text { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; flex-shrink: 0; }
 .hero-text h1 {
-  font-size: 3rem;
+  font-size: clamp(2rem, 8vw, 2.75rem);
   line-height: 0.95;
-  margin: 0.25rem 0 0.5rem;
+  margin: 0.15rem 0 0.25rem;
   color: var(--text);
   text-align: center;
 }
-.actions { display: flex; flex-direction: column; gap: 0.7rem; }
+.actions { display: flex; flex-direction: column; gap: 0.6rem; flex-shrink: 0; }
 .big-btn {
   width: 100%;
-  height: 76px;
-  font-size: 1.25rem;
+  height: 68px;
+  font-size: 1.2rem;
   border-radius: 22px;
 }
 .big-btn :deep(svg) { width: 24px; height: 24px; }
