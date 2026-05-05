@@ -13,9 +13,12 @@ export default defineConfig({
       manifest: {
         name: "Paul's Real Tennis Scorer",
         short_name: "Paul's Tennis",
-        theme_color: '#7a1d1d',
-        background_color: '#f5ede0',
+        description: 'Phone-first PWA for scoring real tennis matches between two players, with chase tracking and end-switching.',
+        theme_color: '#6b1f1f',
+        background_color: '#f7f1e6',
         display: 'standalone',
+        orientation: 'portrait',
+        categories: ['sports', 'utilities'],
         start_url: '/real-tennis-scorer/',
         scope: '/real-tennis-scorer/',
         icons: [

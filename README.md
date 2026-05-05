@@ -1,31 +1,48 @@
 # Paul's Real Tennis Scorer
 
-A Vue 3 PWA for scoring real tennis matches — including chases, the dedans, the grille, the tambour, and all the other oddities. Built to run offline on a phone propped at the side of the court.
+A phone-first Progressive Web App for scoring real tennis matches between two players. Built with Vue 3, TypeScript, Pinia and Vite, it works offline once installed and remembers the active match plus recent history in `localStorage`.
 
-## Stack
+## Real tennis scoring
 
-- Vue 3 + TypeScript
-- Vite + `vite-plugin-pwa` (Workbox precache for full offline support)
-- Pinia for state, Vue Router (hash mode) for navigation
-- Vitest + jsdom for tests
+Real tennis is not lawn tennis. The score format borrows the 15/30/40/game/set pattern, but it has two quirks the engine handles explicitly:
 
-## Scripts
+- **Chases**: when a ball bounces twice, instead of awarding the point a "chase" is laid at the spot. Chases are not played out until two are pending (or the receiver reaches set point), at which point the players switch ends and run off a chase play-off to resolve them.
+- **End-switching**: the chase play-off swaps server and receiver, so the engine has to track ends and chase position, not just points.
+
+Implementation lives in [`src/scoring/engine.ts`](src/scoring/engine.ts) and is covered by the test suite under `src/scoring/`.
+
+## Dev workflow
 
 ```bash
-npm run dev        # local dev server
-npm test           # run the Vitest suite
-npm run build      # type-check + production build into dist/
-npm run typecheck  # vue-tsc --noEmit
-npm run preview    # preview the built app
+npm install
+npm run dev          # local dev server
+npm test             # vitest run (scoring engine + store tests)
+npm run typecheck    # vue-tsc --noEmit
+npm run build        # type-check + production build (emits dist/sw.js + manifest)
+npm run preview      # serve the built app at /real-tennis-scorer/
 ```
 
 ## Deploy
 
-Pushes to `main` trigger `.github/workflows/deploy.yml`, which builds and publishes `dist/` to GitHub Pages. The site lives under the `/real-tennis-scorer/` base path; the app uses `createWebHashHistory` so deep links work on Pages without 404s.
+A push to `main` triggers the GitHub Actions workflow at `.github/workflows/deploy.yml`, which builds and publishes to GitHub Pages.
 
-## Layout
+**Pages is not currently enabled.** The repo is private on the free GitHub plan, which does not allow Pages publishing from private repos. To unblock deployment, pick one:
 
-- `src/scoring/` — pure scoring engine, types, and tests. Real tennis rules are documented inline here.
-- `src/stores/` — Pinia stores (live match + persisted history).
-- `src/views/` + `src/components/` — UI.
-- `src/lib/` — small utilities (id, storage wrapper).
+1. Make the repo public and enable Pages (Settings -> Pages -> Source: GitHub Actions).
+2. Upgrade the account to a plan that allows Pages on private repos (Pro/Team).
+3. Switch hosts: Cloudflare Pages publishes from private repos on the free tier - point it at `dist/` and keep the base path as `/real-tennis-scorer/` (or move to a domain root, in which case update `base` in `vite.config.ts` and the manifest's `start_url`/`scope`).
+
+The build step in CI will succeed regardless; only the deploy step will fail until one of the above is done.
+
+## Architecture
+
+- **Pure scoring engine** - `src/scoring/` (no Vue, no Pinia, fully unit-testable). `engine.ts` is the state machine; `types.ts` holds the score shapes.
+- **Pinia stores** - `src/stores/` (`match.ts` for the active match, `history.ts` for completed matches). Stores auto-persist to `localStorage` on change.
+- **Views** - `src/views/` (Home, MatchSetup, Scoring, ChasePlayoff, History, MatchDetail), wired up via hash-router in `src/router.ts`.
+- **Components** - `src/components/` (BigButton and other shared UI bits).
+- **Storage** - typed `localStorage` wrapper with schema versioning at `src/lib/storage.ts`. Keys: `rts:active-match`, `rts:history`, `rts:schema-version`.
+- **History cap** - the history store keeps a soft cap of **200 matches**; older entries fall off the end.
+
+## Design assets
+
+The placeholder PNG icons in `public/icons/` (192/512/maskable) are temporary. Final icon and visual artwork will be generated from [`claude-design-prompt.md`](claude-design-prompt.md) at the repo root - swap them in once the Claude Design assets land. The PWA manifest in `vite.config.ts` already references the final filenames, so dropping the new PNGs in place is enough.
