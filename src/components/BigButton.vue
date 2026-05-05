@@ -29,6 +29,7 @@ defineEmits<{ (e: 'click'): void }>()
   align-items: center;
   justify-content: center;
   width: 100%;
+  height: 100%;
   min-height: 80px;
   padding: 1rem;
   border: 1px solid var(--border);
@@ -36,7 +37,7 @@ defineEmits<{ (e: 'click'): void }>()
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow);
-  font-size: 1.1rem;
+  font-size: 1.4rem;
   cursor: pointer;
   transition: transform 0.05s ease, background 0.1s ease;
 }

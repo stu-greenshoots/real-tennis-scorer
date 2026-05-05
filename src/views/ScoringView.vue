@@ -119,16 +119,36 @@ function pressLabel(side: Side): string {
     </div>
 
     <div class="big-buttons">
-      <BigButton
-        :label="pressLabel('A')"
-        :subtitle="match.playoffActive ? 'Award this chase' : 'Tap to score'"
-        @click="tapSide('A')"
-      />
-      <BigButton
-        :label="pressLabel('B')"
-        :subtitle="match.playoffActive ? 'Award this chase' : 'Tap to score'"
-        @click="tapSide('B')"
-      />
+      <div class="big-slot">
+        <PointTagPicker
+          v-if="showTagPicker && pendingSide === 'A'"
+          side="A"
+          :playerName="match.players.A"
+          @select="onTagSelect"
+          @cancel="onTagCancel"
+        />
+        <BigButton
+          v-else
+          :label="pressLabel('A')"
+          :subtitle="match.playoffActive ? 'Award this chase' : 'Tap to score'"
+          @click="tapSide('A')"
+        />
+      </div>
+      <div class="big-slot">
+        <PointTagPicker
+          v-if="showTagPicker && pendingSide === 'B'"
+          side="B"
+          :playerName="match.players.B"
+          @select="onTagSelect"
+          @cancel="onTagCancel"
+        />
+        <BigButton
+          v-else
+          :label="pressLabel('B')"
+          :subtitle="match.playoffActive ? 'Award this chase' : 'Tap to score'"
+          @click="tapSide('B')"
+        />
+      </div>
     </div>
 
     <div class="action-row">
@@ -138,14 +158,6 @@ function pressLabel(side: Side): string {
       <button class="btn" @click="undo">Undo</button>
       <button class="btn btn-danger" @click="showEndConfirm = true">End Match</button>
     </div>
-
-    <PointTagPicker
-      v-if="showTagPicker && pendingSide"
-      :side="pendingSide"
-      :playerName="match.players[pendingSide]"
-      @select="onTagSelect"
-      @cancel="onTagCancel"
-    />
 
     <ChaseLinePicker
       v-if="showChasePicker"
@@ -188,8 +200,16 @@ function pressLabel(side: Side): string {
   flex: 1;
   min-height: 0;
 }
+.big-slot {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.big-slot > * { width: 100%; height: 100%; }
 .big-buttons :deep(.big-button) {
-  min-height: max(100px, 30vh);
+  width: 100%;
+  height: 100%;
 }
 .action-row {
   display: grid;

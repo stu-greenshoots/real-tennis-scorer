@@ -234,6 +234,9 @@ function reduceAwardPoint(match: Match, side: Side, tag?: PointTag): Match {
     winner: result.matchWon ?? match.winner,
   }
   if (result.matchWon && !next.endedAt) next = { ...next, endedAt: Date.now() }
+  if (!next.winner && next.config.autoChase && shouldTriggerChasePlayoff(next)) {
+    next = startPlayoff(next)
+  }
   return next
 }
 
