@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMatchStore } from '../stores/match'
 import { PAUL, OPPONENT_AVATARS } from '../lib/roster'
+import { fileToDownscaledDataUrl } from '../lib/photo'
 import Portrait from '../components/Portrait.vue'
 import CourtBackdrop from '../components/CourtBackdrop.vue'
 import NumberSegment from '../components/NumberSegment.vue'
@@ -15,10 +16,35 @@ const matchStore = useMatchStore()
 const playerA = ref('Paul')
 const playerB = ref('')
 const avatarIdx = ref(-1)
+const photoA = ref<string | undefined>(undefined)
+const photoB = ref<string | undefined>(undefined)
+const photoAInput = ref<HTMLInputElement | null>(null)
+const photoBInput = ref<HTMLInputElement | null>(null)
 const setsToWin = ref(2)
 const gamesPerSet = ref(6)
 const tiebreak = ref(true)
 const autoChase = ref(true)
+
+async function onPhotoPicked(side: 'A' | 'B', event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  try {
+    const dataUrl = await fileToDownscaledDataUrl(file)
+    if (side === 'A') photoA.value = dataUrl
+    else photoB.value = dataUrl
+  } catch (err) {
+    console.warn('[setup] failed to read photo', err)
+  } finally {
+    // Reset so re-selecting the same file still triggers change.
+    target.value = ''
+  }
+}
+
+function clearPhoto(side: 'A' | 'B') {
+  if (side === 'A') photoA.value = undefined
+  else photoB.value = undefined
+}
 
 function start() {
   const players = {
@@ -29,12 +55,16 @@ function start() {
     A: PAUL.id,
     B: avatarIdx.value >= 0 ? OPPONENT_AVATARS[avatarIdx.value].id : undefined,
   }
+  const photos = {
+    A: photoA.value,
+    B: photoB.value,
+  }
   matchStore.start(players, {
     setsToWin: setsToWin.value,
     gamesPerSet: gamesPerSet.value,
     tiebreak: tiebreak.value,
     autoChase: autoChase.value,
-  }, avatars)
+  }, avatars, photos)
   router.push('/match')
 }
 </script>
@@ -56,12 +86,42 @@ function start() {
       <div class="player-block">
         <div class="field-label">Player A · host</div>
         <div class="player-card host">
-          <Portrait :id="PAUL.id" :bg="PAUL.bg" :silhouette="PAUL.silhouette" :size="56" />
+          <Portrait
+            :id="PAUL.id"
+            :bg="PAUL.bg"
+            :silhouette="PAUL.silhouette"
+            :src="photoA"
+            :size="56"
+          />
           <div class="player-name">
             <input v-model="playerA" type="text" placeholder="Paul" />
             <div class="hint">Service end starts here</div>
           </div>
           <div class="host-badge">HOST</div>
+        </div>
+        <div class="photo-row">
+          <input
+            ref="photoAInput"
+            type="file"
+            accept="image/*"
+            class="photo-input"
+            @change="(e) => onPhotoPicked('A', e)"
+          />
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            @click="photoAInput?.click()"
+          >
+            {{ photoA ? 'Replace photo' : 'Upload photo' }}
+          </button>
+          <button
+            v-if="photoA"
+            type="button"
+            class="btn btn-ghost btn-sm"
+            @click="clearPhoto('A')"
+          >
+            Remove
+          </button>
         </div>
       </div>
 
@@ -79,12 +139,37 @@ function start() {
             :id="avatarIdx >= 0 ? OPPONENT_AVATARS[avatarIdx].id : 'opponent'"
             :bg="avatarIdx >= 0 ? OPPONENT_AVATARS[avatarIdx].bg : 'var(--surface-sunken)'"
             :silhouette="avatarIdx >= 0 ? OPPONENT_AVATARS[avatarIdx].silhouette : 'long-hair-beard'"
+            :src="photoB"
             :size="56"
           />
           <div class="player-name">
             <input v-model="playerB" type="text" placeholder="Their name" />
-            <div class="hint">Pick an avatar (optional)</div>
+            <div class="hint">Pick an avatar or upload a photo (optional)</div>
           </div>
+        </div>
+        <div class="photo-row">
+          <input
+            ref="photoBInput"
+            type="file"
+            accept="image/*"
+            class="photo-input"
+            @change="(e) => onPhotoPicked('B', e)"
+          />
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            @click="photoBInput?.click()"
+          >
+            {{ photoB ? 'Replace photo' : 'Upload photo' }}
+          </button>
+          <button
+            v-if="photoB"
+            type="button"
+            class="btn btn-ghost btn-sm"
+            @click="clearPhoto('B')"
+          >
+            Remove
+          </button>
         </div>
         <div class="avatar-carousel">
           <button
@@ -236,6 +321,14 @@ function start() {
   color: var(--text-faint);
   font-size: 1.5rem;
 }
+.photo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 0.25rem;
+}
+.photo-input { display: none; }
+.btn-sm { font-size: 0.75rem; padding: 0.3rem 0.55rem; }
 .settings { display: flex; flex-direction: column; gap: 0.6rem; }
 .settings-row { gap: 1rem; }
 .cta-row { padding-top: 0.5rem; }

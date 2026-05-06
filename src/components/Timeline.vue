@@ -21,11 +21,16 @@ function tagLabel(tag?: string): string {
   return tag.replace(/-/g, ' ')
 }
 
-const avatarA = computed(() => PAUL)
+const avatarA = computed(() => {
+  const photo = props.match?.photos?.A
+  return photo ? { ...PAUL, src: photo } : PAUL
+})
 const avatarB = computed(() => {
   const id = props.match?.avatars?.B
-  return OPPONENT_AVATARS.find((o) => o.id === id) ??
+  const base = OPPONENT_AVATARS.find((o) => o.id === id) ??
     { id: 'opponent', bg: 'var(--accent)', silhouette: 'glasses' as const }
+  const photo = props.match?.photos?.B
+  return photo ? { ...base, src: photo } : base
 })
 
 interface Group {

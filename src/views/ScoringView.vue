@@ -73,10 +73,16 @@ function dismissWinner() {
 
 function avatarFor(side: Side) {
   if (!match.value) return PAUL
-  if (side === 'A') return PAUL
-  const avId = match.value.avatars?.B
-  if (!avId) return { id: 'opponent', bg: 'var(--accent)', silhouette: 'glasses' as const }
-  return OPPONENT_AVATARS.find((o) => o.id === avId) ?? OPPONENT_AVATARS[0]
+  const photo = match.value.photos?.[side]
+  const base =
+    side === 'A'
+      ? PAUL
+      : (() => {
+          const avId = match.value!.avatars?.B
+          if (!avId) return { id: 'opponent', bg: 'var(--accent)', silhouette: 'glasses' as const }
+          return OPPONENT_AVATARS.find((o) => o.id === avId) ?? OPPONENT_AVATARS[0]
+        })()
+  return photo ? { ...base, src: photo } : base
 }
 
 function pointLabel(p: GamePoints): string {

@@ -74,9 +74,13 @@ export const useMatchStore = defineStore('match', () => {
     players: { A: string; B: string },
     config: MatchConfig,
     avatars?: { A?: string; B?: string },
+    photos?: { A?: string; B?: string },
   ): void {
     const match = createMatch({ players, config })
-    current.value = avatars ? { ...match, avatars } : match
+    let next: Match = match
+    if (avatars) next = { ...next, avatars }
+    if (photos && (photos.A || photos.B)) next = { ...next, photos }
+    current.value = next
   }
 
   function dispatch(action: Action): void {

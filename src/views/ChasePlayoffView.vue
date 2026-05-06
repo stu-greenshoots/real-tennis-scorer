@@ -43,8 +43,16 @@ function chaseLabel(line: string): string {
 
 function avatarB() {
   const avId = match.value?.avatars?.B
-  if (!avId) return { id: 'opponent', bg: 'var(--accent)', silhouette: 'glasses' as const }
-  return OPPONENT_AVATARS.find((o) => o.id === avId) ?? OPPONENT_AVATARS[0]
+  const base = !avId
+    ? { id: 'opponent', bg: 'var(--accent)', silhouette: 'glasses' as const }
+    : OPPONENT_AVATARS.find((o) => o.id === avId) ?? OPPONENT_AVATARS[0]
+  const photo = match.value?.photos?.B
+  return photo ? { ...base, src: photo } : base
+}
+
+function avatarA() {
+  const photo = match.value?.photos?.A
+  return photo ? { ...PAUL, src: photo } : PAUL
 }
 </script>
 
@@ -77,7 +85,7 @@ function avatarB() {
 
       <!-- Ends switched -->
       <div class="ends-switched">
-        <Portrait v-bind="PAUL" :size="38" />
+        <Portrait v-bind="avatarA()" :size="38" />
         <svg class="swap" width="44" height="22" viewBox="0 0 44 22" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 7 H38" /><path d="M34 3 L38 7 L34 11" />
           <path d="M40 15 H6" /><path d="M10 19 L6 15 L10 11" />
@@ -95,7 +103,7 @@ function avatarB() {
 
       <div v-if="currentChase" class="outcome-buttons">
         <button class="outcome" @click="awardChase('A')">
-          <Portrait v-bind="PAUL" :size="42" />
+          <Portrait v-bind="avatarA()" :size="42" />
           <div class="outcome-text">
             <div class="outcome-label">{{ match.players.A }} wins</div>
             <div class="outcome-sub">Bettered the line</div>
