@@ -69,6 +69,11 @@ export interface Match {
   winner?: Side
   /** Optional avatar IDs (from src/lib/roster.ts) for visual personalisation. */
   avatars?: { A?: string; B?: string }
+  /**
+   * Optional uploaded photos (data URLs) for either player. When present these
+   * take precedence over the avatar silhouette in the Portrait component.
+   */
+  photos?: { A?: string; B?: string }
 }
 
 export type Action =
