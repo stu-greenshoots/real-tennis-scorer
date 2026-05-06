@@ -8,21 +8,54 @@ export async function fileToDownscaledDataUrl(
   max = 320,
   quality = 0.82,
 ): Promise<string> {
-  const objectUrl = URL.createObjectURL(file)
+  // Prefer createImageBitmap with EXIF orientation honored — phone photos
+  // often store rotation in EXIF rather than the pixel buffer, and a raw
+  // <img>/canvas pipeline would render them sideways.
+  const source = await decode(file)
   try {
-    const img = await loadImage(objectUrl)
-    const ratio = Math.min(1, max / Math.max(img.width, img.height))
-    const w = Math.round(img.width * ratio)
-    const h = Math.round(img.height * ratio)
+    const ratio = Math.min(1, max / Math.max(source.width, source.height))
+    const w = Math.round(source.width * ratio)
+    const h = Math.round(source.height * ratio)
     const canvas = document.createElement('canvas')
     canvas.width = w
     canvas.height = h
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('canvas 2d context unavailable')
-    ctx.drawImage(img, 0, 0, w, h)
+    ctx.drawImage(source.image, 0, 0, w, h)
     return canvas.toDataURL('image/jpeg', quality)
   } finally {
-    URL.revokeObjectURL(objectUrl)
+    source.dispose()
+  }
+}
+
+type DecodedImage = {
+  image: CanvasImageSource
+  width: number
+  height: number
+  dispose: () => void
+}
+
+async function decode(file: File): Promise<DecodedImage> {
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+      return {
+        image: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        dispose: () => bitmap.close(),
+      }
+    } catch {
+      // fall through to <img> path
+    }
+  }
+  const objectUrl = URL.createObjectURL(file)
+  const img = await loadImage(objectUrl)
+  return {
+    image: img,
+    width: img.naturalWidth || img.width,
+    height: img.naturalHeight || img.height,
+    dispose: () => URL.revokeObjectURL(objectUrl),
   }
 }
 
