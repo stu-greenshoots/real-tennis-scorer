@@ -110,74 +110,73 @@ function confirm() {
 </script>
 
 <template>
-  <div class="modal-backdrop" @click.self="$emit('cancel')">
-    <div class="modal-sheet chase-line-picker" role="dialog" aria-modal="true">
-      <h3>Lay a chase</h3>
-      <p class="muted small">
-        Played by <strong>{{ laidByName }}</strong> ·
-        {{ end === 'service' ? 'service end' : 'hazard end' }}
-      </p>
+  <div class="chase-line-picker" role="group" :aria-label="`Lay chase by ${laidByName}`">
+    <div class="picker-head">
+      <span class="muted small">
+        Lay chase — {{ end === 'service' ? 'service end' : 'hazard end' }}
+      </span>
+    </div>
 
-      <p class="muted small section-label">Modifier</p>
-      <div class="modifiers">
-        <button
-          v-for="m in MODIFIERS"
-          :key="m.id"
-          class="btn mod-btn"
-          :class="{ 'btn-primary': modifier === m.id }"
-          @click="toggleModifier(m.id)"
-        >
-          {{ m.label }}
-        </button>
-      </div>
+    <div class="modifiers">
+      <button
+        v-for="m in MODIFIERS"
+        :key="m.id"
+        class="btn mod-btn"
+        :class="{ 'btn-primary': modifier === m.id }"
+        @click="toggleModifier(m.id)"
+      >
+        {{ m.label }}
+      </button>
+    </div>
 
-      <p class="muted small section-label">
-        {{ modifier === 'between' ? 'Pick two adjacent lines' : 'Pick a line' }}
-      </p>
-      <div class="lines">
-        <button
-          v-for="l in lines"
-          :key="l"
-          class="btn line-btn"
-          :class="{ 'btn-primary': selected.includes(l), dim: !isLineEnabled(l) }"
-          :disabled="!isLineEnabled(l)"
-          @click="toggleLine(l)"
-        >
-          {{ formatLine(l) }}
-        </button>
-      </div>
+    <div class="lines">
+      <button
+        v-for="l in lines"
+        :key="l"
+        class="btn line-btn"
+        :class="{ 'btn-primary': selected.includes(l), dim: !isLineEnabled(l) }"
+        :disabled="!isLineEnabled(l)"
+        @click="toggleLine(l)"
+      >
+        {{ formatLine(l) }}
+      </button>
+    </div>
 
-      <div v-if="previewLabel" class="preview">{{ previewLabel }}</div>
+    <div v-if="previewLabel" class="preview">{{ previewLabel }}</div>
 
-      <div class="row" style="gap: 0.5rem;">
-        <button class="btn btn-ghost btn-block" @click="$emit('cancel')">Cancel</button>
-        <button
-          class="btn btn-primary btn-block"
-          :disabled="!isValid"
-          @click="confirm"
-        >
-          Lay chase
-        </button>
-      </div>
+    <div class="row" style="gap: 0.4rem;">
+      <button class="btn btn-ghost btn-block" @click="$emit('cancel')">Cancel</button>
+      <button
+        class="btn btn-primary btn-block"
+        :disabled="!isValid"
+        @click="confirm"
+      >
+        Lay chase
+      </button>
     </div>
   </div>
 </template>
 
 <style scoped>
-.section-label { margin-top: 0.6rem; margin-bottom: 0.3rem; }
+.chase-line-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+}
+.picker-head { text-align: center; }
 .modifiers {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0.3rem;
 }
-.mod-btn { font-size: 0.75rem; min-height: 40px; padding: 0.3rem 0.2rem; }
+.mod-btn { font-size: 0.7rem; min-height: 36px; padding: 0.25rem 0.2rem; }
 .lines {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.4rem;
-  margin-bottom: 0.6rem;
+  gap: 0.35rem;
 }
-.line-btn { min-height: 44px; font-size: 0.9rem; }
+.line-btn { min-height: 38px; font-size: 0.82rem; }
 .line-btn.dim { opacity: 0.35; }
 .preview {
   text-align: center;
@@ -185,8 +184,7 @@ function confirm() {
   color: var(--primary);
   background: var(--surface-sunken);
   border-radius: var(--radius-2);
-  padding: 0.4rem 0.6rem;
-  margin-bottom: 0.6rem;
+  padding: 0.3rem 0.5rem;
 }
-.small { font-size: 0.8rem; }
+.small { font-size: 0.75rem; }
 </style>

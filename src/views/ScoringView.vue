@@ -2,7 +2,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MatchTimer from '../components/MatchTimer.vue'
-import PointTagPicker from '../components/PointTagPicker.vue'
 import ChaseLinePicker from '../components/ChaseLinePicker.vue'
 import Portrait from '../components/Portrait.vue'
 import CourtBackdrop from '../components/CourtBackdrop.vue'
@@ -22,57 +21,36 @@ onMounted(() => {
 const match = computed(() => matchStore.current)
 const baseUrl = import.meta.env.BASE_URL
 
-const showTagPicker = ref(false)
-const pendingSide = ref<Side | null>(null)
-const showChasePicker = ref(false)
-const chasePickerEnd = ref<ChaseEnd>('hazard')
-const chasePickerLaidBy = ref<Side>('A')
 const showEndConfirm = ref(false)
+/** Which side currently has its chase picker open (in-place on the tile). */
+const chasePickerSide = ref<Side | null>(null)
 
-/**
- * Server is always rendered at the top of the screen, receiver at the bottom.
- * `match.serving` flips both on normal game-end alternation and on chase
- * playoff start (where the engine swaps `serving` and `servingEnd` together),
- * so the same field drives the visual order in both cases.
- */
 const topSide = computed<Side>(() => match.value?.serving ?? 'A')
 const bottomSide = computed<Side>(() => (topSide.value === 'A' ? 'B' : 'A'))
 
-function tapSide(side: Side) {
+function award(side: Side, tag: PointTag) {
   if (!match.value) return
-  if (match.value.playoffActive) {
-    matchStore.dispatch({ type: 'awardPoint', side, tag: 'chase-won' })
-    return
-  }
-  pendingSide.value = side
-  showTagPicker.value = true
+  matchStore.dispatch({ type: 'awardPoint', side, tag })
+}
+
+function awardChasePoint(side: Side) {
+  matchStore.dispatch({ type: 'awardPoint', side, tag: 'chase-won' })
 }
 
 function openChaseFor(side: Side) {
   if (!match.value || match.value.playoffActive) return
+  chasePickerSide.value = side
+}
+
+function chaseEndFor(side: Side): ChaseEnd {
   // The tile we tap is the player who played the chase shot; the chase lands
   // at the opposite end.
-  chasePickerLaidBy.value = side
-  chasePickerEnd.value = side === match.value.serving ? 'hazard' : 'service'
-  showChasePicker.value = true
-}
-
-function onTagSelect(tag: PointTag) {
-  if (pendingSide.value) {
-    matchStore.dispatch({ type: 'awardPoint', side: pendingSide.value, tag })
-  }
-  showTagPicker.value = false
-  pendingSide.value = null
-}
-
-function onTagCancel() {
-  showTagPicker.value = false
-  pendingSide.value = null
+  return side === match.value!.serving ? 'hazard' : 'service'
 }
 
 function onChaseSelect(payload: { value: ChaseValue; laidBy: Side }) {
   matchStore.dispatch({ type: 'layChase', value: payload.value, laidBy: payload.laidBy })
-  showChasePicker.value = false
+  chasePickerSide.value = null
 }
 
 function undo() {
@@ -125,13 +103,16 @@ function roleLabel(side: Side): string {
   if (!match.value) return ''
   return side === match.value.serving ? 'Server' : 'Receiver'
 }
+
+function isServer(side: Side): boolean {
+  return !!match.value && side === match.value.serving
+}
 </script>
 
 <template>
   <div v-if="match" class="view scoring-view">
     <CourtBackdrop :opacity="0.05" />
     <div class="scoring-content">
-      <!-- Top bar: stats + back -->
       <div class="top-bar">
         <button class="back-btn" @click="router.push('/')" aria-label="Home">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6L9 12L15 18"/></svg>
@@ -179,69 +160,51 @@ function roleLabel(side: Side): string {
         </ul>
       </div>
 
-      <!-- Server on top, receiver below. The tiles re-order whenever serving
-           switches, so each player's name + avatar moves with their role. -->
-      <div class="big-buttons">
-        <div class="big-slot top-slot">
-          <PointTagPicker
-            v-if="showTagPicker && pendingSide === topSide"
-            :side="topSide"
-            :playerName="match.players[topSide]"
-            @select="onTagSelect"
-            @cancel="onTagCancel"
-          />
-          <div v-else class="slot-wrap">
-            <button class="tap-target" @click="tapSide(topSide)">
-              <div class="tap-content">
-                <Portrait v-bind="avatarFor(topSide)" :size="100" />
-                <div class="tap-text">
-                  <div class="tap-score">{{ pointLabel(match.score.points[topSide]) }}</div>
-                  <div class="tap-name">{{ match.players[topSide] }}</div>
-                  <div class="tap-role">{{ roleLabel(topSide) }}</div>
-                  <div class="tap-cta">{{ match.playoffActive ? 'Award chase' : 'Tap to win point' }}</div>
-                </div>
-              </div>
-            </button>
-            <button
-              v-if="!match.playoffActive"
-              class="chase-btn"
-              type="button"
-              @click="openChaseFor(topSide)"
-            >
-              <Glyphs glyph="penthouse" :size="14" /> Set chase
-            </button>
+      <div class="tiles">
+        <section
+          v-for="side in [topSide, bottomSide]"
+          :key="side"
+          class="tile"
+          :class="{ 'tile-server': isServer(side), 'tile-receiver': !isServer(side) }"
+        >
+          <header class="tile-head">
+            <Portrait v-bind="avatarFor(side)" :size="56" />
+            <div class="tile-info">
+              <div class="tile-name">{{ match.players[side] }}</div>
+              <div class="tile-role">{{ roleLabel(side) }}</div>
+            </div>
+            <div class="tile-score">{{ pointLabel(match.score.points[side]) }}</div>
+          </header>
+
+          <div class="tile-body">
+            <ChaseLinePicker
+              v-if="chasePickerSide === side"
+              :end="chaseEndFor(side)"
+              :laidBy="side"
+              :laidByName="match.players[side]"
+              @select="onChaseSelect"
+              @cancel="chasePickerSide = null"
+            />
+            <div v-else-if="match.playoffActive" class="actions single">
+              <button class="btn btn-primary btn-action" @click="awardChasePoint(side)">
+                Award chase to {{ match.players[side] }}
+              </button>
+            </div>
+            <div v-else class="actions" :class="isServer(side) ? 'four' : 'three'">
+              <button class="btn btn-action" @click="award(side, 'winner')">Stroke</button>
+              <template v-if="isServer(side)">
+                <button class="btn btn-action" @click="award(side, 'gallery')">Winning Gallery</button>
+                <button class="btn btn-action" @click="award(side, 'grille')">Grille</button>
+              </template>
+              <template v-else>
+                <button class="btn btn-action" @click="award(side, 'dedans')">Dedans</button>
+              </template>
+              <button class="btn btn-action btn-chase" @click="openChaseFor(side)">
+                <Glyphs glyph="penthouse" :size="14" /> Lay Chase
+              </button>
+            </div>
           </div>
-        </div>
-        <div class="big-slot bottom-slot">
-          <PointTagPicker
-            v-if="showTagPicker && pendingSide === bottomSide"
-            :side="bottomSide"
-            :playerName="match.players[bottomSide]"
-            @select="onTagSelect"
-            @cancel="onTagCancel"
-          />
-          <div v-else class="slot-wrap">
-            <button class="tap-target" @click="tapSide(bottomSide)">
-              <div class="tap-content">
-                <Portrait v-bind="avatarFor(bottomSide)" :size="100" />
-                <div class="tap-text">
-                  <div class="tap-score">{{ pointLabel(match.score.points[bottomSide]) }}</div>
-                  <div class="tap-name">{{ match.players[bottomSide] }}</div>
-                  <div class="tap-role">{{ roleLabel(bottomSide) }}</div>
-                  <div class="tap-cta">{{ match.playoffActive ? 'Award chase' : 'Tap to win point' }}</div>
-                </div>
-              </div>
-            </button>
-            <button
-              v-if="!match.playoffActive"
-              class="chase-btn"
-              type="button"
-              @click="openChaseFor(bottomSide)"
-            >
-              <Glyphs glyph="penthouse" :size="14" /> Set chase
-            </button>
-          </div>
-        </div>
+        </section>
       </div>
 
       <div class="action-row">
@@ -249,15 +212,6 @@ function roleLabel(side: Side): string {
         <button class="btn btn-small btn-danger" @click="showEndConfirm = true">End match</button>
       </div>
     </div>
-
-    <ChaseLinePicker
-      v-if="showChasePicker"
-      :end="chasePickerEnd"
-      :laidBy="chasePickerLaidBy"
-      :laidByName="match.players[chasePickerLaidBy]"
-      @select="onChaseSelect"
-      @cancel="showChasePicker = false"
-    />
 
     <div v-if="showEndConfirm" class="modal-backdrop" @click.self="showEndConfirm = false">
       <div class="modal-sheet">
@@ -296,8 +250,8 @@ function roleLabel(side: Side): string {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 0.75rem 1rem 1rem;
-  gap: 0.6rem;
+  padding: 0.6rem 0.85rem 0.85rem;
+  gap: 0.5rem;
   min-height: 0;
 }
 .top-bar {
@@ -330,116 +284,114 @@ function roleLabel(side: Side): string {
   background: var(--surface-raised);
   border-radius: var(--radius-3);
   border: 1px solid var(--line);
-  padding: 0.5rem 0.5rem;
+  padding: 0.45rem 0.5rem;
   text-align: center;
 }
 .stat .stat-label {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 700;
-  letter-spacing: 1.2px;
+  letter-spacing: 1.1px;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 .stat .stat-val {
   font-family: var(--font-num);
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text);
 }
 .stat .dot { color: var(--text-faint); margin: 0 0.3rem; }
 .stat.divider { border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
 
-.big-buttons {
+.tiles {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   flex: 1;
   min-height: 0;
 }
-.big-slot {
+.tile {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--surface-raised);
+  border-radius: var(--radius-4);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  padding: 0.55rem 0.6rem;
   flex: 1 1 0;
   min-height: 0;
-  overflow: hidden;
 }
-.big-slot > * { width: 100%; height: 100%; }
-.slot-wrap { position: relative; width: 100%; height: 100%; }
+.tile-receiver { background: var(--surface); }
 
-.tap-target {
-  width: 100%;
-  height: 100%;
-  border: none;
-  cursor: pointer;
-  border-radius: var(--radius-4);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-2);
-  padding: 0.5rem;
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.15s var(--ease-spring);
-}
-.tap-target:active { transform: scale(0.985); }
-.bottom-slot .tap-target { background: var(--surface); }
-
-.tap-content {
+.tile-head {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.9rem;
-  height: 100%;
+  gap: 0.65rem;
 }
-.tap-text { text-align: left; }
-.tap-score {
+.tile-info { flex: 1; min-width: 0; }
+.tile-name {
   font-family: var(--font-display);
-  font-size: 4rem;
-  line-height: 0.85;
+  font-size: 1.4rem;
+  line-height: 1;
+  font-weight: 700;
   color: var(--text);
-  font-weight: 700;
 }
-.tap-name {
-  font-size: 0.9rem;
+.tile-role {
+  font-size: 0.68rem;
   font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
   letter-spacing: 1.2px;
-}
-.tap-role {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--primary);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  color: var(--primary);
   margin-top: 0.1rem;
 }
-.tap-cta {
-  font-size: 0.7rem;
-  color: var(--accent);
+.tile-score {
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  line-height: 0.9;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-top: 0.2rem;
-}
-.chase-btn {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  background: var(--surface-sunken);
   color: var(--text);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-pill);
-  padding: 0.3rem 0.6rem;
-  font-size: 0.7rem;
+}
+
+.tile-body { flex: 1; display: flex; min-height: 0; }
+.actions {
+  display: grid;
+  gap: 0.55rem;
+  flex: 1;
+  width: 100%;
+}
+.actions.four {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.actions.three {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.actions.three > :last-child { grid-column: 1 / span 2; }
+.actions.single { display: flex; }
+
+.btn-action {
+  font-size: 1.1rem;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
+  min-height: 64px;
+  height: 100%;
+  width: 100%;
+  text-transform: none;
+  letter-spacing: 0;
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-1);
+  transition: transform 0.12s var(--ease-spring);
+}
+.btn-action:active { transform: scale(0.97); }
+.btn-chase {
+  background: var(--surface-sunken);
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 1.05rem;
 }
-.chase-btn:active { transform: scale(0.96); }
-
-.action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
 
 .banner-head {
   display: flex;
@@ -467,6 +419,8 @@ function roleLabel(side: Side): string {
   left: 0;
   color: var(--accent);
 }
+
+.action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
 
 .winner-sheet { text-align: center; }
 .winner-img {
