@@ -7,9 +7,10 @@ import ChaseLinePicker from '../components/ChaseLinePicker.vue'
 import Portrait from '../components/Portrait.vue'
 import CourtBackdrop from '../components/CourtBackdrop.vue'
 import Glyphs from '../components/Glyphs.vue'
-import type { PointTag, Side, ChaseLine, GamePoints } from '../scoring/types'
+import type { PointTag, Side, ChaseValue, GamePoints, ChaseEnd } from '../scoring/types'
 import { useMatchStore } from '../stores/match'
 import { PAUL, OPPONENT_AVATARS } from '../lib/roster'
+import { formatChase } from '../scoring/format'
 
 const router = useRouter()
 const matchStore = useMatchStore()
@@ -24,7 +25,18 @@ const baseUrl = import.meta.env.BASE_URL
 const showTagPicker = ref(false)
 const pendingSide = ref<Side | null>(null)
 const showChasePicker = ref(false)
+const chasePickerEnd = ref<ChaseEnd>('hazard')
+const chasePickerLaidBy = ref<Side>('A')
 const showEndConfirm = ref(false)
+
+/**
+ * Server is always rendered at the top of the screen, receiver at the bottom.
+ * `match.serving` flips both on normal game-end alternation and on chase
+ * playoff start (where the engine swaps `serving` and `servingEnd` together),
+ * so the same field drives the visual order in both cases.
+ */
+const topSide = computed<Side>(() => match.value?.serving ?? 'A')
+const bottomSide = computed<Side>(() => (topSide.value === 'A' ? 'B' : 'A'))
 
 function tapSide(side: Side) {
   if (!match.value) return
@@ -34,6 +46,15 @@ function tapSide(side: Side) {
   }
   pendingSide.value = side
   showTagPicker.value = true
+}
+
+function openChaseFor(side: Side) {
+  if (!match.value || match.value.playoffActive) return
+  // The tile we tap is the player who played the chase shot; the chase lands
+  // at the opposite end.
+  chasePickerLaidBy.value = side
+  chasePickerEnd.value = side === match.value.serving ? 'hazard' : 'service'
+  showChasePicker.value = true
 }
 
 function onTagSelect(tag: PointTag) {
@@ -49,8 +70,8 @@ function onTagCancel() {
   pendingSide.value = null
 }
 
-function onChaseSelect(payload: { line: ChaseLine; laidBy: Side }) {
-  matchStore.dispatch({ type: 'layChase', line: payload.line, laidBy: payload.laidBy })
+function onChaseSelect(payload: { value: ChaseValue; laidBy: Side }) {
+  matchStore.dispatch({ type: 'layChase', value: payload.value, laidBy: payload.laidBy })
   showChasePicker.value = false
 }
 
@@ -100,24 +121,9 @@ function deuceLabel(): string | null {
   return null
 }
 
-function chaseBadgeText(): string | null {
-  const m = match.value
-  if (!m || m.pendingChases.length === 0) return null
-  return m.pendingChases.map((c) => formatChaseLine(c.line)).join(' · ')
-}
-
-function formatChaseLine(line: string): string {
-  const map: Record<string, string> = {
-    'better-than-half-a-yard': '> ½ yd',
-    'half-a-yard': '½ yd',
-    'worse-than-half-a-yard': '< ½ yd',
-    'last-gallery': 'last gal.',
-    'second-gallery': '2nd gal.',
-    'first-gallery': '1st gal.',
-    'hazard-side': 'hazard',
-    door: 'door',
-  }
-  return map[line] ?? `${line}`
+function roleLabel(side: Side): string {
+  if (!match.value) return ''
+  return side === match.value.serving ? 'Server' : 'Receiver'
 }
 </script>
 
@@ -125,110 +131,130 @@ function formatChaseLine(line: string): string {
   <div v-if="match" class="view scoring-view">
     <CourtBackdrop :opacity="0.05" />
     <div class="scoring-content">
-      <!-- Top bar with portraits + scores -->
+      <!-- Top bar: stats + back -->
       <div class="top-bar">
         <button class="back-btn" @click="router.push('/')" aria-label="Home">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6L9 12L15 18"/></svg>
         </button>
-        <div class="player-summary">
-          <Portrait v-bind="avatarFor('A')" :size="40" />
-          <div class="ps-text">
-            <div class="ps-score" :class="{ serving: match.serving === 'A' }">{{ pointLabel(match.score.points.A) }}</div>
-            <div class="ps-name">{{ match.players.A }}<span v-if="match.serving === 'A'"> · srv</span></div>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-label">Games</div>
+            <div class="stat-val">{{ match.score.games.A }}<span class="dot">·</span>{{ match.score.games.B }}</div>
           </div>
-        </div>
-        <div class="player-summary right">
-          <div class="ps-text">
-            <div class="ps-score" :class="{ serving: match.serving === 'B' }">{{ pointLabel(match.score.points.B) }}</div>
-            <div class="ps-name">{{ match.players.B }}<span v-if="match.serving === 'B'"> · srv</span></div>
+          <div class="stat divider">
+            <div class="stat-label">Sets</div>
+            <div class="stat-val">{{ match.score.sets.A }}<span class="dot">·</span>{{ match.score.sets.B }}</div>
           </div>
-          <Portrait v-bind="avatarFor('B')" :size="40" />
+          <div class="stat">
+            <div class="stat-label">Match</div>
+            <div class="stat-val">
+              <MatchTimer :startedAt="match.startedAt" :endedAt="match.endedAt" />
+            </div>
+          </div>
         </div>
       </div>
 
       <div v-if="deuceLabel()" class="deuce-pill">{{ deuceLabel() }}</div>
 
-      <!-- Stats card: games / sets / timer -->
-      <div class="stats">
-        <div class="stat">
-          <div class="stat-label">Games</div>
-          <div class="stat-val">{{ match.score.games.A }}<span class="dot">·</span>{{ match.score.games.B }}</div>
+      <div v-if="match.playoffActive && match.pendingChases.length > 0" class="banner chase-banner">
+        <div class="banner-head">
+          <Glyphs glyph="penthouse" :size="16" />
+          Playing off chases — switch ends!
         </div>
-        <div class="stat divider">
-          <div class="stat-label">Sets</div>
-          <div class="stat-val">{{ match.score.sets.A }}<span class="dot">·</span>{{ match.score.sets.B }}</div>
+        <ul class="chase-list">
+          <li v-for="(c, i) in match.pendingChases" :key="i">{{ formatChase(c.value) }}</li>
+        </ul>
+      </div>
+      <div v-else-if="match.playoffActive" class="banner">
+        <Glyphs glyph="penthouse" :size="16" />
+        Playing off chases — switch ends!
+      </div>
+      <div v-else-if="match.pendingChases.length > 0" class="banner chase-banner">
+        <div class="banner-head">
+          <Glyphs glyph="penthouse" :size="16" />
+          {{ match.pendingChases.length }} chase{{ match.pendingChases.length > 1 ? 's' : '' }} pending
         </div>
-        <div class="stat">
-          <div class="stat-label">Match</div>
-          <div class="stat-val">
-            <MatchTimer :startedAt="match.startedAt" :endedAt="match.endedAt" />
+        <ul class="chase-list">
+          <li v-for="(c, i) in match.pendingChases" :key="i">{{ formatChase(c.value) }}</li>
+        </ul>
+      </div>
+
+      <!-- Server on top, receiver below. The tiles re-order whenever serving
+           switches, so each player's name + avatar moves with their role. -->
+      <div class="big-buttons">
+        <div class="big-slot top-slot">
+          <PointTagPicker
+            v-if="showTagPicker && pendingSide === topSide"
+            :side="topSide"
+            :playerName="match.players[topSide]"
+            @select="onTagSelect"
+            @cancel="onTagCancel"
+          />
+          <div v-else class="slot-wrap">
+            <button class="tap-target" @click="tapSide(topSide)">
+              <div class="tap-content">
+                <Portrait v-bind="avatarFor(topSide)" :size="100" />
+                <div class="tap-text">
+                  <div class="tap-score">{{ pointLabel(match.score.points[topSide]) }}</div>
+                  <div class="tap-name">{{ match.players[topSide] }}</div>
+                  <div class="tap-role">{{ roleLabel(topSide) }}</div>
+                  <div class="tap-cta">{{ match.playoffActive ? 'Award chase' : 'Tap to win point' }}</div>
+                </div>
+              </div>
+            </button>
+            <button
+              v-if="!match.playoffActive"
+              class="chase-btn"
+              type="button"
+              @click="openChaseFor(topSide)"
+            >
+              <Glyphs glyph="penthouse" :size="14" /> Set chase
+            </button>
+          </div>
+        </div>
+        <div class="big-slot bottom-slot">
+          <PointTagPicker
+            v-if="showTagPicker && pendingSide === bottomSide"
+            :side="bottomSide"
+            :playerName="match.players[bottomSide]"
+            @select="onTagSelect"
+            @cancel="onTagCancel"
+          />
+          <div v-else class="slot-wrap">
+            <button class="tap-target" @click="tapSide(bottomSide)">
+              <div class="tap-content">
+                <Portrait v-bind="avatarFor(bottomSide)" :size="100" />
+                <div class="tap-text">
+                  <div class="tap-score">{{ pointLabel(match.score.points[bottomSide]) }}</div>
+                  <div class="tap-name">{{ match.players[bottomSide] }}</div>
+                  <div class="tap-role">{{ roleLabel(bottomSide) }}</div>
+                  <div class="tap-cta">{{ match.playoffActive ? 'Award chase' : 'Tap to win point' }}</div>
+                </div>
+              </div>
+            </button>
+            <button
+              v-if="!match.playoffActive"
+              class="chase-btn"
+              type="button"
+              @click="openChaseFor(bottomSide)"
+            >
+              <Glyphs glyph="penthouse" :size="14" /> Set chase
+            </button>
           </div>
         </div>
       </div>
 
-      <div v-if="match.playoffActive" class="banner">
-        <Glyphs glyph="penthouse" :size="16" />
-        Playing off chases — switch ends!
-      </div>
-      <div v-else-if="chaseBadgeText()" class="banner chase-banner">
-        <Glyphs glyph="penthouse" :size="16" />
-        {{ match.pendingChases.length }} chase{{ match.pendingChases.length > 1 ? 's' : '' }} pending — {{ chaseBadgeText() }}
-      </div>
-
-      <!-- Big tap targets -->
-      <div class="big-buttons">
-        <div class="big-slot">
-          <PointTagPicker
-            v-if="showTagPicker && pendingSide === 'A'"
-            side="A"
-            :playerName="match.players.A"
-            @select="onTagSelect"
-            @cancel="onTagCancel"
-          />
-          <button v-else class="tap-target" @click="tapSide('A')">
-            <div class="tap-content">
-              <Portrait v-bind="avatarFor('A')" :size="100" />
-              <div class="tap-text">
-                <div class="tap-score">{{ pointLabel(match.score.points.A) }}</div>
-                <div class="tap-name">{{ match.players.A }}</div>
-                <div class="tap-cta">{{ match.playoffActive ? 'Award chase' : 'Tap to win point' }}</div>
-              </div>
-            </div>
-          </button>
-        </div>
-        <div class="big-slot">
-          <PointTagPicker
-            v-if="showTagPicker && pendingSide === 'B'"
-            side="B"
-            :playerName="match.players.B"
-            @select="onTagSelect"
-            @cancel="onTagCancel"
-          />
-          <button v-else class="tap-target" @click="tapSide('B')">
-            <div class="tap-content">
-              <Portrait v-bind="avatarFor('B')" :size="100" />
-              <div class="tap-text">
-                <div class="tap-score">{{ pointLabel(match.score.points.B) }}</div>
-                <div class="tap-name">{{ match.players.B }}</div>
-                <div class="tap-cta">{{ match.playoffActive ? 'Award chase' : 'Tap to win point' }}</div>
-              </div>
-            </div>
-          </button>
-        </div>
-      </div>
-
       <div class="action-row">
-        <button class="btn btn-small" @click="showChasePicker = true" :disabled="match.playoffActive">
-          <Glyphs glyph="penthouse" :size="14" /> Chase
-        </button>
         <button class="btn btn-small" @click="undo">↶ Undo</button>
-        <button class="btn btn-small btn-danger" @click="showEndConfirm = true">End</button>
+        <button class="btn btn-small btn-danger" @click="showEndConfirm = true">End match</button>
       </div>
     </div>
 
     <ChaseLinePicker
       v-if="showChasePicker"
-      :players="match.players"
+      :end="chasePickerEnd"
+      :laidBy="chasePickerLaidBy"
+      :laidByName="match.players[chasePickerLaidBy]"
       @select="onChaseSelect"
       @cancel="showChasePicker = false"
     />
@@ -276,7 +302,7 @@ function formatChaseLine(line: string): string {
 }
 .top-bar {
   display: grid;
-  grid-template-columns: auto 1fr 1fr;
+  grid-template-columns: auto 1fr;
   align-items: center;
   gap: 0.5rem;
 }
@@ -286,33 +312,6 @@ function formatChaseLine(line: string): string {
   padding: 0.4rem;
   cursor: pointer;
   color: var(--text);
-}
-.player-summary {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  min-width: 0;
-}
-.player-summary.right { flex-direction: row-reverse; }
-.ps-text { display: flex; flex-direction: column; min-width: 0; }
-.player-summary.right .ps-text { text-align: right; }
-.ps-score {
-  font-family: var(--font-display);
-  font-size: 2rem;
-  line-height: 0.9;
-  font-weight: 700;
-  color: var(--text);
-}
-.ps-score.serving { color: var(--primary); }
-.ps-name {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .deuce-pill {
   align-self: center;
@@ -364,6 +363,7 @@ function formatChaseLine(line: string): string {
   overflow: hidden;
 }
 .big-slot > * { width: 100%; height: 100%; }
+.slot-wrap { position: relative; width: 100%; height: 100%; }
 
 .tap-target {
   width: 100%;
@@ -379,7 +379,7 @@ function formatChaseLine(line: string): string {
   transition: transform 0.15s var(--ease-spring);
 }
 .tap-target:active { transform: scale(0.985); }
-.big-slot:nth-child(2) .tap-target { background: var(--surface); }
+.bottom-slot .tap-target { background: var(--surface); }
 
 .tap-content {
   display: flex;
@@ -403,6 +403,14 @@ function formatChaseLine(line: string): string {
   text-transform: uppercase;
   letter-spacing: 1.2px;
 }
+.tap-role {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 0.1rem;
+}
 .tap-cta {
   font-size: 0.7rem;
   color: var(--accent);
@@ -411,8 +419,54 @@ function formatChaseLine(line: string): string {
   letter-spacing: 1px;
   margin-top: 0.2rem;
 }
+.chase-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: var(--surface-sunken);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.chase-btn:active { transform: scale(0.96); }
 
-.action-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.4rem; }
+.action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+
+.banner-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+}
+.chase-list {
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.chase-list li {
+  font-size: 0.85rem;
+  color: var(--text);
+  padding-left: 0.6rem;
+  position: relative;
+}
+.chase-list li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
 
 .winner-sheet { text-align: center; }
 .winner-img {

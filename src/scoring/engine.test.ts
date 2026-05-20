@@ -6,7 +6,17 @@ import {
   isSetDecidingGame,
   shouldTriggerChasePlayoff,
 } from './engine'
-import type { Action, Match, MatchConfig, Side } from './types'
+import type { Action, ChaseValue, Match, MatchConfig, Side } from './types'
+
+const serviceExact = (line: ChaseValue['lines'][number]): ChaseValue => ({
+  end: 'service',
+  modifier: 'exact',
+  lines: [line],
+})
+const serviceBetween = (
+  a: ChaseValue['lines'][number],
+  b: ChaseValue['lines'][number],
+): ChaseValue => ({ end: 'service', modifier: 'between', lines: [a, b] })
 
 const baseConfig: MatchConfig = {
   setsToWin: 2,
@@ -143,9 +153,10 @@ describe('chases — laying', () => {
     let m = newMatch()
     m = award(m, 'A') // 15-0
     const before = JSON.stringify(m.score)
-    m = reduce(m, { type: 'layChase', line: '4', laidBy: 'B' })
+    m = reduce(m, { type: 'layChase', value: serviceExact('4'), laidBy: 'B' })
     expect(m.pendingChases.length).toBe(1)
-    expect(m.pendingChases[0].line).toBe('4')
+    expect(m.pendingChases[0].value.lines).toEqual(['4'])
+    expect(m.pendingChases[0].value.end).toBe('service')
     expect(m.pendingChases[0].laidBy).toBe('B')
     expect(JSON.stringify(m.score)).toBe(before)
   })
@@ -155,9 +166,9 @@ describe('chases — playoff trigger', () => {
   it('two chases trigger playoff: ends switch, playoffActive, playoffRemaining=2', () => {
     let m = newMatch({ autoChase: true })
     const beforeEnd = m.servingEnd
-    m = reduce(m, { type: 'layChase', line: '4', laidBy: 'B' })
+    m = reduce(m, { type: 'layChase', value: serviceExact('4'), laidBy: 'B' })
     expect(m.playoffActive).toBe(false)
-    m = reduce(m, { type: 'layChase', line: 'half-a-yard', laidBy: 'A' })
+    m = reduce(m, { type: 'layChase', value: serviceBetween('1', '2'), laidBy: 'A' })
     expect(m.playoffActive).toBe(true)
     expect(m.playoffRemaining).toBe(2)
     expect(m.servingEnd).not.toBe(beforeEnd)
@@ -179,14 +190,14 @@ describe('chases — playoff trigger', () => {
     expect(m.score.points).toEqual({ A: 40, B: 30 })
     expect(isSetDecidingGame(m)).toBe(true)
     // Lay one chase — should auto-trigger
-    m = reduce(m, { type: 'layChase', line: '3', laidBy: 'B' })
+    m = reduce(m, { type: 'layChase', value: serviceExact('3'), laidBy: 'B' })
     expect(m.playoffActive).toBe(true)
     expect(m.playoffRemaining).toBe(1)
   })
 
   it('shouldTriggerChasePlayoff returns false with single chase, no game point', () => {
     let m = newMatch({ autoChase: false })
-    m = reduce(m, { type: 'layChase', line: '4', laidBy: 'B' })
+    m = reduce(m, { type: 'layChase', value: serviceExact('4'), laidBy: 'B' })
     expect(shouldTriggerChasePlayoff(m)).toBe(false)
   })
 })
@@ -194,8 +205,8 @@ describe('chases — playoff trigger', () => {
 describe('chases — playoff resolution', () => {
   it('awardPoint during playoff is chase-won, decrements remaining, drains queue', () => {
     let m = newMatch({ autoChase: true })
-    m = reduce(m, { type: 'layChase', line: '4', laidBy: 'B' })
-    m = reduce(m, { type: 'layChase', line: '3', laidBy: 'A' })
+    m = reduce(m, { type: 'layChase', value: serviceExact('4'), laidBy: 'B' })
+    m = reduce(m, { type: 'layChase', value: serviceExact('3'), laidBy: 'A' })
     expect(m.playoffActive).toBe(true)
     expect(m.playoffRemaining).toBe(2)
 
@@ -229,7 +240,7 @@ describe('undo', () => {
     let m = newMatch({ autoChase: false })
     m = award(m, 'A')
     const before = { score: JSON.stringify(m.score), pending: m.pendingChases.length }
-    m = reduce(m, { type: 'layChase', line: '4', laidBy: 'B' })
+    m = reduce(m, { type: 'layChase', value: serviceExact('4'), laidBy: 'B' })
     expect(m.pendingChases.length).toBe(1)
     m = reduce(m, { type: 'undo' })
     expect(JSON.stringify(m.score)).toBe(before.score)
@@ -238,8 +249,8 @@ describe('undo', () => {
 
   it('restores state after a full playoff', () => {
     let m = newMatch({ autoChase: true })
-    m = reduce(m, { type: 'layChase', line: '4', laidBy: 'B' })
-    m = reduce(m, { type: 'layChase', line: '3', laidBy: 'A' })
+    m = reduce(m, { type: 'layChase', value: serviceExact('4'), laidBy: 'B' })
+    m = reduce(m, { type: 'layChase', value: serviceExact('3'), laidBy: 'A' })
     // playoff begins; remaining 2
     m = award(m, 'A') // resolve first, playoff still active
     const checkpoint = {

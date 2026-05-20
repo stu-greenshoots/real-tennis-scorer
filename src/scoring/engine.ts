@@ -2,7 +2,7 @@ import { id } from '../lib/id'
 import type {
   Action,
   Chase,
-  ChaseLine,
+  ChaseValue,
   GamePoints,
   Match,
   MatchConfig,
@@ -240,14 +240,14 @@ function reduceAwardPoint(match: Match, side: Side, tag?: PointTag): Match {
   return next
 }
 
-function reduceLayChase(match: Match, line: ChaseLine, laidBy: Side): Match {
+function reduceLayChase(match: Match, value: ChaseValue, laidBy: Side): Match {
   if (match.winner) return match
-  const chase: Chase = { line, laidBy, scoreAtLay: cloneSnapshot(match.score) }
+  const chase: Chase = { value, laidBy, scoreAtLay: cloneSnapshot(match.score) }
   const ev = makeEvent({
     winner: null,
-    chaseLaid: line,
+    chaseLaid: value,
     scoreAfter: cloneSnapshot(match.score),
-    note: `chase laid at ${line} by ${laidBy}`,
+    note: `chase laid by ${laidBy}`,
   })
   let next: Match = {
     ...match,
@@ -269,7 +269,9 @@ function reduceLayChase(match: Match, line: ChaseLine, laidBy: Side): Match {
  * log, and (b) it makes undo trivial (just pop the last event).
  */
 function startPlayoff(match: Match): Match {
+  // Ends switch — and so do the server / receiver roles.
   const newServingEnd = other(match.servingEnd)
+  const newServing = other(match.serving)
   const ev = makeEvent({
     winner: null,
     endsSwitchedAfter: true,
@@ -279,6 +281,7 @@ function startPlayoff(match: Match): Match {
   return {
     ...match,
     servingEnd: newServingEnd,
+    serving: newServing,
     playoffActive: true,
     playoffRemaining: match.pendingChases.length,
     events: [...match.events, ev],
@@ -320,7 +323,7 @@ function replayEvent(match: Match, ev: PointEvent): Match {
   if (ev.chaseLaid && ev.winner === null) {
     const laidBy = deriveLaidBy(ev)
     const chase: Chase = {
-      line: ev.chaseLaid,
+      value: ev.chaseLaid,
       laidBy,
       scoreAtLay: cloneSnapshot(match.score),
     }
@@ -335,6 +338,7 @@ function replayEvent(match: Match, ev: PointEvent): Match {
     return {
       ...match,
       servingEnd: other(match.servingEnd),
+      serving: other(match.serving),
       playoffActive: true,
       playoffRemaining: match.pendingChases.length,
       events: [...match.events, ev],
@@ -386,7 +390,7 @@ export function reduce(match: Match, action: Action): Match {
     case 'awardPoint':
       return reduceAwardPoint(match, action.side, action.tag)
     case 'layChase':
-      return reduceLayChase(match, action.line, action.laidBy)
+      return reduceLayChase(match, action.value, action.laidBy)
     case 'startChasePlayoff':
       if (match.playoffActive || match.pendingChases.length === 0) return match
       return startPlayoff(match)

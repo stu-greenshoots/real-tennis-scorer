@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import type { Action, Match, MatchConfig } from '../scoring/types'
 import { createMatch, isMatchOver, reduce } from '../scoring/engine'
+import { migrateMatch } from '../scoring/migrate'
 import { KEYS, load, remove, save } from '../lib/storage'
 import { useHistoryStore } from './history'
 
@@ -28,7 +29,7 @@ function hydrate(): Match | null {
     remove(KEYS.active)
     return null
   }
-  return raw
+  return migrateMatch(raw)
 }
 
 export const useMatchStore = defineStore('match', () => {

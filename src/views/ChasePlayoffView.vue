@@ -6,6 +6,7 @@ import { useMatchStore } from '../stores/match'
 import Portrait from '../components/Portrait.vue'
 import CourtBackdrop from '../components/CourtBackdrop.vue'
 import { PAUL, OPPONENT_AVATARS } from '../lib/roster'
+import { formatChase } from '../scoring/format'
 
 const router = useRouter()
 const matchStore = useMatchStore()
@@ -37,9 +38,6 @@ function awardChase(side: Side) {
   }
 }
 
-function chaseLabel(line: string): string {
-  return String(line).replace(/-/g, ' ')
-}
 
 function avatarB() {
   const avId = match.value?.avatars?.B
@@ -96,7 +94,7 @@ function avatarA() {
 
       <div v-if="currentChase" class="chase-card">
         <div class="kicker">Now playing off</div>
-        <div class="chase-line">{{ chaseLabel(currentChase.line) }}</div>
+        <div class="chase-line">{{ formatChase(currentChase.value) }}</div>
         <div class="muted small">Originally laid by {{ match.players[currentChase.laidBy] }}</div>
       </div>
       <div v-else class="card center muted">All chases resolved.</div>

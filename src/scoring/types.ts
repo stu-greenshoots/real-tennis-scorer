@@ -10,11 +10,56 @@ export type PointTag =
   | 'unforced-error'
   | 'let'
 
-export type ChaseLine =
-  | '1' | '2' | '3' | '4' | '5' | '6'
-  | 'better-than-half-a-yard' | 'half-a-yard' | 'worse-than-half-a-yard'
-  | 'last-gallery' | 'second-gallery' | 'door' | 'first-gallery'
-  | 'hazard-side'
+/**
+ * Service-end chase line identifiers, ordered from far end of the court
+ * (closest to back wall) toward the net. Indexing-by-position is significant —
+ * the chase picker uses neighbour-position for the "between" modifier
+ * adjacency check.
+ */
+export const SERVICE_LINES = [
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  'last-gallery',
+  'yard-worse',
+  'second-gallery',
+  'door',
+  'first-gallery',
+  'the-line',
+] as const
+
+export type ServiceLine = (typeof SERVICE_LINES)[number]
+
+/** Hazard-end chase line identifiers, same ordering convention. */
+export const HAZARD_LINES = [
+  'hazard-1',
+  'hazard-2',
+  'hazard-second-gallery',
+  'hazard-door',
+  'hazard-first-gallery',
+  'hazard-line',
+] as const
+
+export type HazardLine = (typeof HAZARD_LINES)[number]
+
+export type ChaseLine = ServiceLine | HazardLine
+
+export type ChaseEnd = 'service' | 'hazard'
+
+export type ChaseModifier = 'exact' | 'better' | 'worse' | 'between'
+
+/**
+ * Structured chase value. `lines` has length 1 for exact/better/worse and
+ * length 2 (adjacent) for between.
+ */
+export interface ChaseValue {
+  end: ChaseEnd
+  modifier: ChaseModifier
+  lines: ChaseLine[]
+}
 
 export type GamePoints = 0 | 15 | 30 | 40 | 'AD'
 
@@ -26,7 +71,7 @@ export interface ScoreSnapshot {
 }
 
 export interface Chase {
-  line: ChaseLine
+  value: ChaseValue
   laidBy: Side
   scoreAtLay: ScoreSnapshot
 }
@@ -36,7 +81,7 @@ export interface PointEvent {
   ts: number
   winner: Side | null
   tag?: PointTag
-  chaseLaid?: ChaseLine
+  chaseLaid?: ChaseValue
   endsSwitchedAfter?: boolean
   scoreAfter: ScoreSnapshot
   note?: string
@@ -78,7 +123,7 @@ export interface Match {
 
 export type Action =
   | { type: 'awardPoint'; side: Side; tag?: PointTag }
-  | { type: 'layChase'; line: ChaseLine; laidBy: Side }
+  | { type: 'layChase'; value: ChaseValue; laidBy: Side }
   | { type: 'startChasePlayoff' }
   | { type: 'undo' }
   | { type: 'finish' }

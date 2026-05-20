@@ -5,6 +5,7 @@ import Portrait from './Portrait.vue'
 import GlyphDivider from './GlyphDivider.vue'
 import Glyphs from './Glyphs.vue'
 import { PAUL, OPPONENT_AVATARS } from '../lib/roster'
+import { formatChase } from '../scoring/format'
 
 const props = defineProps<{
   events: PointEvent[]
@@ -67,7 +68,7 @@ const groups = computed<Group[]>(() => {
 })
 
 function tagBadge(ev: PointEvent): string {
-  if (ev.chaseLaid) return `Chase ${String(ev.chaseLaid).replace(/-/g, ' ')}`
+  if (ev.chaseLaid) return formatChase(ev.chaseLaid)
   if (ev.tag) return tagLabel(ev.tag)
   if (ev.endsSwitchedAfter) return 'Ends switched'
   if (ev.note) return ev.note

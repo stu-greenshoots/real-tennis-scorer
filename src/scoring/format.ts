@@ -1,4 +1,4 @@
-import type { ChaseLine, Match, ScoreSnapshot } from './types'
+import type { ChaseLine, ChaseValue, Match, ScoreSnapshot } from './types'
 
 export function formatPoints(score: ScoreSnapshot, deuceLabel = 'deuce'): string {
   const { A, B } = score.points
@@ -8,32 +8,59 @@ export function formatPoints(score: ScoreSnapshot, deuceLabel = 'deuce'): string
   return `${A}-${B}`
 }
 
-export function formatChase(line: ChaseLine): string {
+/** Human label for a single chase-line id (no end / modifier wrapping). */
+export function formatLine(line: ChaseLine): string {
   switch (line) {
     case '1':
+      return '1 yard'
     case '2':
+      return '2 yards'
     case '3':
+      return '3 yards'
     case '4':
+      return '4 yards'
     case '5':
+      return '5 yards'
     case '6':
-      return `chase ${line}`
-    case 'better-than-half-a-yard':
-      return 'chase better than half a yard'
-    case 'half-a-yard':
-      return 'chase half a yard'
-    case 'worse-than-half-a-yard':
-      return 'chase worse than half a yard'
+      return '6 yards'
     case 'last-gallery':
-      return 'chase last gallery'
+      return 'last gallery'
+    case 'yard-worse':
+      return 'yard worse'
     case 'second-gallery':
-      return 'chase second gallery'
+      return 'second gallery'
     case 'door':
-      return 'chase door'
+      return 'the door'
     case 'first-gallery':
-      return 'chase first gallery'
-    case 'hazard-side':
-      return 'chase hazard side'
+      return 'first gallery'
+    case 'the-line':
+      return 'the line'
+    case 'hazard-1':
+      return '1 yard'
+    case 'hazard-2':
+      return '2 yards'
+    case 'hazard-second-gallery':
+      return '2nd gallery'
+    case 'hazard-door':
+      return 'the door'
+    case 'hazard-first-gallery':
+      return '1st gallery'
+    case 'hazard-line':
+      return 'the line'
   }
+}
+
+export function formatChase(value: ChaseValue): string {
+  // All chases are "Chase ..."; chases laid at the hazard end (the receiver's
+  // end) get an extra "hazard" qualifier after the verb.
+  const prefix = value.end === 'hazard' ? 'Chase hazard' : 'Chase'
+  if (value.modifier === 'between' && value.lines.length === 2) {
+    return `${prefix} between ${formatLine(value.lines[0])} and ${formatLine(value.lines[1])}`
+  }
+  const line = formatLine(value.lines[0])
+  if (value.modifier === 'better') return `${prefix} better than ${line}`
+  if (value.modifier === 'worse') return `${prefix} worse than ${line}`
+  return `${prefix} ${line}`
 }
 
 export function formatScoreLine(match: Match): string {

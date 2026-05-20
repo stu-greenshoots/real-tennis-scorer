@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import type { Match } from '../scoring/types'
+import { migrateMatch } from '../scoring/migrate'
 import { KEYS, load, save } from '../lib/storage'
 
 /**
@@ -27,7 +28,7 @@ function isMatchShape(value: unknown): value is Match {
 function hydrate(): Match[] {
   const raw = load<unknown>(KEYS.history)
   if (!Array.isArray(raw)) return []
-  const matches = raw.filter(isMatchShape)
+  const matches = raw.filter(isMatchShape).map(migrateMatch)
   if (matches.length !== raw.length) {
     console.warn(
       `[history] discarded ${raw.length - matches.length} malformed match entr${

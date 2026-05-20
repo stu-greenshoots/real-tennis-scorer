@@ -1,35 +1,111 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import type { ChaseLine, Side } from '../scoring/types'
+import { computed, ref } from 'vue'
+import {
+  SERVICE_LINES,
+  HAZARD_LINES,
+  type ChaseEnd,
+  type ChaseLine,
+  type ChaseModifier,
+  type ChaseValue,
+  type Side,
+} from '../scoring/types'
+import { formatLine, formatChase } from '../scoring/format'
 
-defineProps<{ players: { A: string; B: string } }>()
+const props = defineProps<{
+  end: ChaseEnd
+  laidBy: Side
+  laidByName: string
+}>()
 const emit = defineEmits<{
-  (e: 'select', payload: { line: ChaseLine; laidBy: Side }): void
+  (e: 'select', payload: { value: ChaseValue; laidBy: Side }): void
   (e: 'cancel'): void
 }>()
 
-const LINES: { line: ChaseLine; label: string }[] = [
-  { line: '1', label: 'Chase 1' },
-  { line: '2', label: 'Chase 2' },
-  { line: '3', label: 'Chase 3' },
-  { line: '4', label: 'Chase 4' },
-  { line: '5', label: 'Chase 5' },
-  { line: '6', label: 'Chase 6' },
-  { line: 'better-than-half-a-yard', label: 'Better than half a yard' },
-  { line: 'half-a-yard', label: 'Half a yard' },
-  { line: 'worse-than-half-a-yard', label: 'Worse than half a yard' },
-  { line: 'last-gallery', label: 'Last gallery' },
-  { line: 'second-gallery', label: 'Second gallery' },
-  { line: 'door', label: 'Door' },
-  { line: 'first-gallery', label: 'First gallery' },
-  { line: 'hazard-side', label: 'Hazard side' },
+const lines = computed<readonly ChaseLine[]>(() =>
+  props.end === 'service' ? SERVICE_LINES : HAZARD_LINES,
+)
+
+const modifier = ref<ChaseModifier>('exact')
+const selected = ref<ChaseLine[]>([])
+
+const MODIFIERS: { id: ChaseModifier; label: string }[] = [
+  { id: 'exact', label: 'Exact' },
+  { id: 'better', label: 'Better than' },
+  { id: 'worse', label: 'Worse than' },
+  { id: 'between', label: 'Between' },
 ]
 
-const laidBy = ref<Side | null>(null)
+function indexOf(line: ChaseLine): number {
+  return lines.value.indexOf(line)
+}
 
-function pick(line: ChaseLine) {
-  if (!laidBy.value) return
-  emit('select', { line, laidBy: laidBy.value })
+/**
+ * For "between": after one line is picked, only its immediate neighbours in
+ * the ordered list remain selectable as the second pick.
+ */
+function isLineEnabled(line: ChaseLine): boolean {
+  if (modifier.value !== 'between') return true
+  if (selected.value.length === 0) return true
+  if (selected.value.includes(line)) return true
+  if (selected.value.length === 2) return false
+  const anchor = indexOf(selected.value[0])
+  const i = indexOf(line)
+  return i === anchor - 1 || i === anchor + 1
+}
+
+function toggleLine(line: ChaseLine) {
+  if (!isLineEnabled(line)) return
+  const i = selected.value.indexOf(line)
+  if (i >= 0) {
+    // toggle off
+    selected.value = selected.value.filter((l) => l !== line)
+    return
+  }
+  if (modifier.value === 'between') {
+    if (selected.value.length < 2) {
+      // keep ordered by position so the label reads naturally
+      const next = [...selected.value, line].sort((a, b) => indexOf(a) - indexOf(b))
+      selected.value = next
+    }
+    return
+  }
+  selected.value = [line]
+}
+
+function toggleModifier(id: ChaseModifier) {
+  if (modifier.value === id) {
+    // Tapping the active modifier returns to default (exact, no half-yard).
+    modifier.value = 'exact'
+    // If we were in between with 2 picks, drop to one.
+    if (selected.value.length > 1) selected.value = [selected.value[0]]
+    return
+  }
+  if (id === 'between') {
+    // moving into between — keep current pick if any, but no need to clear
+    modifier.value = 'between'
+    if (selected.value.length > 1) selected.value = [selected.value[0]]
+    return
+  }
+  // Moving to a single-line modifier — collapse to a single pick if needed.
+  modifier.value = id
+  if (selected.value.length > 1) selected.value = [selected.value[0]]
+}
+
+const isValid = computed(() => {
+  if (modifier.value === 'between') return selected.value.length === 2
+  return selected.value.length === 1
+})
+
+const previewValue = computed<ChaseValue | null>(() => {
+  if (!isValid.value) return null
+  return { end: props.end, modifier: modifier.value, lines: [...selected.value] }
+})
+
+const previewLabel = computed(() => (previewValue.value ? formatChase(previewValue.value) : ''))
+
+function confirm() {
+  if (!previewValue.value) return
+  emit('select', { value: previewValue.value, laidBy: props.laidBy })
 }
 </script>
 
@@ -37,54 +113,80 @@ function pick(line: ChaseLine) {
   <div class="modal-backdrop" @click.self="$emit('cancel')">
     <div class="modal-sheet chase-line-picker" role="dialog" aria-modal="true">
       <h3>Lay a chase</h3>
-      <p class="muted small">Who bounced twice (chase laid by them)?</p>
-      <div class="laidby">
+      <p class="muted small">
+        Played by <strong>{{ laidByName }}</strong> ·
+        {{ end === 'service' ? 'service end' : 'hazard end' }}
+      </p>
+
+      <p class="muted small section-label">Modifier</p>
+      <div class="modifiers">
         <button
-          class="btn"
-          :class="{ 'btn-primary': laidBy === 'A' }"
-          @click="laidBy = 'A'"
+          v-for="m in MODIFIERS"
+          :key="m.id"
+          class="btn mod-btn"
+          :class="{ 'btn-primary': modifier === m.id }"
+          @click="toggleModifier(m.id)"
         >
-          {{ players.A }}
-        </button>
-        <button
-          class="btn"
-          :class="{ 'btn-primary': laidBy === 'B' }"
-          @click="laidBy = 'B'"
-        >
-          {{ players.B }}
+          {{ m.label }}
         </button>
       </div>
-      <p class="muted small">Pick the chase line:</p>
-      <div class="lines" :class="{ disabled: !laidBy }">
+
+      <p class="muted small section-label">
+        {{ modifier === 'between' ? 'Pick two adjacent lines' : 'Pick a line' }}
+      </p>
+      <div class="lines">
         <button
-          v-for="l in LINES"
-          :key="l.line"
+          v-for="l in lines"
+          :key="l"
           class="btn line-btn"
-          :disabled="!laidBy"
-          @click="pick(l.line)"
+          :class="{ 'btn-primary': selected.includes(l), dim: !isLineEnabled(l) }"
+          :disabled="!isLineEnabled(l)"
+          @click="toggleLine(l)"
         >
-          {{ l.label }}
+          {{ formatLine(l) }}
         </button>
       </div>
-      <button class="btn btn-ghost btn-block" @click="$emit('cancel')">Cancel</button>
+
+      <div v-if="previewLabel" class="preview">{{ previewLabel }}</div>
+
+      <div class="row" style="gap: 0.5rem;">
+        <button class="btn btn-ghost btn-block" @click="$emit('cancel')">Cancel</button>
+        <button
+          class="btn btn-primary btn-block"
+          :disabled="!isValid"
+          @click="confirm"
+        >
+          Lay chase
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.laidby {
+.section-label { margin-top: 0.6rem; margin-bottom: 0.3rem; }
+.modifiers {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.3rem;
 }
+.mod-btn { font-size: 0.75rem; min-height: 40px; padding: 0.3rem 0.2rem; }
 .lines {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.4rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.6rem;
 }
-.lines.disabled { opacity: 0.5; }
-.line-btn { min-height: 48px; font-size: 0.95rem; }
+.line-btn { min-height: 44px; font-size: 0.9rem; }
+.line-btn.dim { opacity: 0.35; }
+.preview {
+  text-align: center;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-2);
+  padding: 0.4rem 0.6rem;
+  margin-bottom: 0.6rem;
+}
 .small { font-size: 0.8rem; }
 </style>
