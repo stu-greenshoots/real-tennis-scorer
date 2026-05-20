@@ -144,7 +144,7 @@ function confirm() {
 
     <div v-if="previewLabel" class="preview">{{ previewLabel }}</div>
 
-    <div class="row" style="gap: 0.4rem;">
+    <div class="action-row">
       <button class="btn btn-ghost btn-block" @click="$emit('cancel')">Cancel</button>
       <button
         class="btn btn-primary btn-block"
@@ -159,32 +159,42 @@ function confirm() {
 
 <style scoped>
 .chase-line-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: 0.3rem;
   width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 .picker-head { text-align: center; }
 .modifiers {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 0.3rem;
+  gap: 0.25rem;
 }
-.mod-btn { font-size: 0.7rem; min-height: 36px; padding: 0.25rem 0.2rem; }
+.mod-btn { font-size: 0.68rem; min-height: 32px; padding: 0.2rem 0.2rem; }
 .lines {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.35rem;
+  gap: 0.3rem;
+  min-height: 0;
+  overflow: auto;
+  align-content: start;
 }
-.line-btn { min-height: 38px; font-size: 0.82rem; }
+.line-btn { font-size: 0.82rem; padding: 0.2rem 0.4rem; }
 .line-btn.dim { opacity: 0.35; }
 .preview {
   text-align: center;
   font-weight: 700;
+  font-size: 0.85rem;
   color: var(--primary);
   background: var(--surface-sunken);
   border-radius: var(--radius-2);
-  padding: 0.3rem 0.5rem;
+  padding: 0.25rem 0.5rem;
 }
-.small { font-size: 0.75rem; }
+.small { font-size: 0.72rem; }
+.action-row {
+  display: flex;
+  gap: 0.4rem;
+}
 </style>

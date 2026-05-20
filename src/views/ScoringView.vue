@@ -25,7 +25,12 @@ const showEndConfirm = ref(false)
 /** Which side currently has its chase picker open (in-place on the tile). */
 const chasePickerSide = ref<Side | null>(null)
 
-const topSide = computed<Side>(() => match.value?.serving ?? 'A')
+/**
+ * Tile positions follow court ends, not the serving role. `servingEnd` only
+ * flips when a chase playoff physically swaps the ends; normal game-end
+ * alternation only changes the role labels on each tile, not their order.
+ */
+const topSide = computed<Side>(() => match.value?.servingEnd ?? 'A')
 const bottomSide = computed<Side>(() => (topSide.value === 'A' ? 'B' : 'A'))
 
 function award(side: Side, tag: PointTag) {
@@ -165,7 +170,12 @@ function isServer(side: Side): boolean {
           v-for="side in [topSide, bottomSide]"
           :key="side"
           class="tile"
-          :class="{ 'tile-server': isServer(side), 'tile-receiver': !isServer(side) }"
+          :class="{
+            'tile-server': isServer(side),
+            'tile-receiver': !isServer(side),
+            'tile-active': chasePickerSide === side,
+            'tile-compact': chasePickerSide !== null && chasePickerSide !== side,
+          }"
         >
           <header class="tile-head">
             <Portrait v-bind="avatarFor(side)" :size="56" />
@@ -176,7 +186,8 @@ function isServer(side: Side): boolean {
             <div class="tile-score">{{ pointLabel(match.score.points[side]) }}</div>
           </header>
 
-          <div class="tile-body">
+          <div v-if="chasePickerSide !== null && chasePickerSide !== side" class="tile-body-empty"></div>
+          <div v-else class="tile-body">
             <ChaseLinePicker
               v-if="chasePickerSide === side"
               :end="chaseEndFor(side)"
@@ -321,8 +332,16 @@ function isServer(side: Side): boolean {
   padding: 0.55rem 0.6rem;
   flex: 1 1 0;
   min-height: 0;
+  transition: flex 0.2s var(--ease-spring);
 }
 .tile-receiver { background: var(--surface); }
+.tile-active { flex: 1 1 auto; }
+.tile-compact {
+  flex: 0 0 auto;
+  gap: 0;
+}
+.tile-compact .tile-head { padding: 0; }
+.tile-body-empty { display: none; }
 
 .tile-head {
   display: flex;
@@ -353,7 +372,13 @@ function isServer(side: Side): boolean {
   color: var(--text);
 }
 
-.tile-body { flex: 1; display: flex; min-height: 0; }
+.tile-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
 .actions {
   display: grid;
   gap: 0.55rem;

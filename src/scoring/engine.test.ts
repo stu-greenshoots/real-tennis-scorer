@@ -83,12 +83,12 @@ describe('deuce / advantage', () => {
   })
 })
 
-describe('serving alternation', () => {
-  it('alternates server when a game is won', () => {
+describe('serving on game end', () => {
+  it('does not alternate when a game is won (real-tennis rule)', () => {
     let m = newMatch({}, 'A')
     expect(m.serving).toBe('A')
     m = winGame(m, 'A')
-    expect(m.serving).toBe('B')
+    expect(m.serving).toBe('A')
     m = winGame(m, 'B')
     expect(m.serving).toBe('A')
   })

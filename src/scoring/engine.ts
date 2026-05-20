@@ -114,14 +114,15 @@ function applyRawPoint(match: Match, winner: Side): RawPointResult {
     score.points[winner] = nextPoint(wp as GamePoints)
   }
 
-  let serving = match.serving
+  const serving = match.serving
   let setWon: Side | null = null
   let matchWon: Side | null = null
 
   if (gameWon) {
     score.points = { A: 0, B: 0 }
     score.games[winner] += 1
-    serving = other(match.serving)
+    // Real-tennis rule: serving does not alternate when a game is won.
+    // The only thing that swaps serving (and ends) is a chase playoff.
 
     setWon = isSetWon(score.games, match.config)
     if (setWon) {
