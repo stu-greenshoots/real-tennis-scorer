@@ -4,7 +4,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/real-tennis-scorer/',
+  // Served at the root of the custom domain real-tennis.stu-bot.uk, so the base
+  // is '/'. (It was '/real-tennis-scorer/' when this lived at the project-page
+  // subpath; the manifest start_url/scope below moved for the same reason.)
+  base: '/',
   plugins: [
     vue(),
     VitePWA({
@@ -19,8 +22,8 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait',
         categories: ['sports', 'utilities'],
-        start_url: '/real-tennis-scorer/',
-        scope: '/real-tennis-scorer/',
+        start_url: '/',
+        scope: '/',
         icons: [
           { src: 'icons/192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/512.png', sizes: '512x512', type: 'image/png' },
