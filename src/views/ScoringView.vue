@@ -8,8 +8,9 @@ import CourtBackdrop from '../components/CourtBackdrop.vue'
 import Glyphs from '../components/Glyphs.vue'
 import type { PointTag, Side, ChaseValue, GamePoints, ChaseEnd } from '../scoring/types'
 import { useMatchStore } from '../stores/match'
-import { PAUL, OPPONENT_AVATARS } from '../lib/roster'
+import { resolveAvatar } from '../lib/roster'
 import { formatChase } from '../scoring/format'
+import { concessionFifteensForGame, ruleForDifference } from '../scoring/handicapping'
 
 const router = useRouter()
 const matchStore = useMatchStore()
@@ -76,23 +77,45 @@ function dismissWinner() {
 }
 
 function avatarFor(side: Side) {
-  if (!match.value) return PAUL
-  const photo = match.value.photos?.[side]
-  const base =
-    side === 'A'
-      ? PAUL
-      : (() => {
-          const avId = match.value!.avatars?.B
-          if (!avId) return { id: 'opponent', bg: 'var(--accent)', silhouette: 'glasses' as const }
-          return OPPONENT_AVATARS.find((o) => o.id === avId) ?? OPPONENT_AVATARS[0]
-        })()
-  return photo ? { ...base, src: photo } : base
+  return resolveAvatar(match.value?.avatars?.[side], match.value?.photos?.[side])
 }
 
 function pointLabel(p: GamePoints): string {
   if (p === 'AD') return 'AD'
   return String(p)
 }
+
+// Handicap "owe" display: a side below love shows "owe 15/30/40".
+const FIFTEEN: Record<number, string> = { 1: '15', 2: '30', 3: '40' }
+function oweFor(side: Side): number {
+  return match.value?.score.owe?.[side] ?? 0
+}
+function mainPoints(side: Side): string {
+  const owe = oweFor(side)
+  if (owe > 0) return FIFTEEN[owe] ?? String(owe * 15)
+  return pointLabel(match.value!.score.points[side])
+}
+
+/** The handicap concession in force for the current game, or null. */
+const handicapGame = computed(() => {
+  const m = match.value
+  if (!m?.handicap) return null
+  const rule = ruleForDifference(m.handicap.difference)
+  if (!rule) return null
+  const recv = m.handicap.receivingSide
+  const ower: Side = recv === 'A' ? 'B' : 'A'
+  const gameInSet = m.score.games.A + m.score.games.B + 1
+  const recF = concessionFifteensForGame(rule.receive, gameInSet)
+  const oweF = concessionFifteensForGame(rule.owe, gameInSet)
+  return {
+    difference: m.handicap.difference,
+    recvName: m.players[recv],
+    owerName: m.players[ower],
+    recvText: recF > 0 ? `receives ${FIFTEEN[recF]}` : 'receives Love',
+    oweText: oweF > 0 ? `owes ${FIFTEEN[oweF]}` : 'owes nothing',
+    structural: rule.structural,
+  }
+})
 
 function deuceLabel(): string | null {
   const m = match.value
@@ -142,6 +165,18 @@ function isServer(side: Side): boolean {
 
       <div v-if="deuceLabel()" class="deuce-pill">{{ deuceLabel() }}</div>
 
+      <div v-if="handicapGame" class="hcp-strip">
+        <div class="hcp-strip-main">
+          <span class="hcp-badge">HCP {{ handicapGame.difference }}</span>
+          <span>{{ handicapGame.recvName }} {{ handicapGame.recvText }}</span>
+          <span class="hcp-dot">·</span>
+          <span>{{ handicapGame.owerName }} {{ handicapGame.oweText }}</span>
+        </div>
+        <div v-if="handicapGame.structural" class="hcp-strip-struct">
+          <Glyphs glyph="tambour" :size="12" /> {{ handicapGame.structural }}
+        </div>
+      </div>
+
       <div v-if="match.playoffActive && match.pendingChases.length > 0" class="banner chase-banner">
         <div class="banner-head">
           <Glyphs glyph="penthouse" :size="16" />
@@ -183,7 +218,9 @@ function isServer(side: Side): boolean {
               <div class="tile-name">{{ match.players[side] }}</div>
               <div class="tile-role">{{ roleLabel(side) }}</div>
             </div>
-            <div class="tile-score">{{ pointLabel(match.score.points[side]) }}</div>
+            <div class="tile-score" :class="{ 'is-owe': oweFor(side) > 0 }">
+              <span v-if="oweFor(side) > 0" class="owe-lead">owe</span>{{ mainPoints(side) }}
+            </div>
           </header>
 
           <div v-if="chasePickerSide !== null && chasePickerSide !== side" class="tile-body-empty"></div>
@@ -371,6 +408,53 @@ function isServer(side: Side): boolean {
   font-weight: 700;
   color: var(--text);
 }
+.tile-score.is-owe { color: var(--primary); font-size: 1.9rem; }
+.owe-lead {
+  font-family: var(--font-body);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  vertical-align: middle;
+  margin-right: 0.2rem;
+  color: var(--text-muted);
+}
+
+.hcp-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-2);
+  background: var(--surface-raised);
+  border: 1px solid var(--accent-soft);
+}
+.hcp-strip-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+.hcp-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--primary-contrast);
+  background: var(--primary);
+  border-radius: var(--radius-pill);
+  padding: 0.1rem 0.4rem;
+}
+.hcp-dot { color: var(--text-faint); }
+.hcp-strip-struct {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+.hcp-strip-struct svg { color: var(--accent); flex: 0 0 auto; }
 
 .tile-body {
   flex: 1;

@@ -1,4 +1,5 @@
 import { id } from '../lib/id'
+import { concessionFifteensForGame, ruleForDifference } from './handicapping'
 import type {
   Action,
   Chase,
@@ -23,6 +24,7 @@ const cloneSnapshot = (s: ScoreSnapshot): ScoreSnapshot => ({
   games: { A: s.games.A, B: s.games.B },
   sets: { A: s.sets.A, B: s.sets.B },
   setHistory: s.setHistory.map((h) => ({ A: h.A, B: h.B })),
+  owe: { A: s.owe?.A ?? 0, B: s.owe?.B ?? 0 },
 })
 
 const emptySnapshot = (): ScoreSnapshot => ({
@@ -30,7 +32,39 @@ const emptySnapshot = (): ScoreSnapshot => ({
   games: { A: 0, B: 0 },
   sets: { A: 0, B: 0 },
   setHistory: [],
+  owe: { A: 0, B: 0 },
 })
+
+const RECEIVE_POINTS: Record<0 | 1 | 2, GamePoints> = { 0: 0, 1: 15, 2: 30 }
+
+/**
+ * Pre-load a game's starting points/owe from the handicap odds. The receiving
+ * (weaker) side starts ahead (0/15/30); the owing side starts behind by
+ * `owe` fifteens. Applied at the start of every game — game numbering is
+ * 1-based within the set and resets each set.
+ */
+function applyGamePreload(
+  score: ScoreSnapshot,
+  handicap: Match['handicap'],
+  gameInSet: number,
+): void {
+  score.points = { A: 0, B: 0 }
+  score.owe = { A: 0, B: 0 }
+  if (!handicap) return
+  const rule = ruleForDifference(handicap.difference)
+  if (!rule) return
+  const recv = handicap.receivingSide
+  const receiveFifteens = Math.min(2, concessionFifteensForGame(rule.receive, gameInSet)) as 0 | 1 | 2
+  score.points[recv] = RECEIVE_POINTS[receiveFifteens]
+  score.owe[other(recv)] = concessionFifteensForGame(rule.owe, gameInSet)
+}
+
+/** A fresh snapshot with game 1's handicap concessions pre-loaded. */
+function startingSnapshot(handicap: Match['handicap']): ScoreSnapshot {
+  const s = emptySnapshot()
+  applyGamePreload(s, handicap, 1)
+  return s
+}
 
 const nextPoint = (p: GamePoints): GamePoints => {
   if (p === 0) return 15
@@ -48,6 +82,7 @@ export function createMatch(opts: {
   config: MatchConfig
   servingEnd?: Side
   serving?: Side
+  handicap?: { difference: number; receivingSide: Side }
 }): Match {
   const serving = opts.serving ?? 'A'
   const servingEnd = opts.servingEnd ?? 'A'
@@ -64,7 +99,8 @@ export function createMatch(opts: {
     playoffActive: false,
     playoffRemaining: 0,
     events: [],
-    score: emptySnapshot(),
+    handicap: opts.handicap,
+    score: startingSnapshot(opts.handicap),
   }
 }
 
@@ -75,15 +111,8 @@ export function createMatch(opts: {
 function isSetWon(games: { A: number; B: number }, config: MatchConfig): Side | null {
   const target = config.gamesPerSet
   const { A, B } = games
-  if (config.tiebreak) {
-    if (A >= target && A - B >= 2) return 'A'
-    if (B >= target && B - A >= 2) return 'B'
-    if (A === target + 1 && B === target) return 'A'
-    if (B === target + 1 && A === target) return 'B'
-  } else {
-    if (A >= target && A - B >= 2) return 'A'
-    if (B >= target && B - A >= 2) return 'B'
-  }
+  if (A >= target && A - B >= 2) return 'A'
+  if (B >= target && B - A >= 2) return 'B'
   return null
 }
 
@@ -98,6 +127,15 @@ interface RawPointResult {
 function applyRawPoint(match: Match, winner: Side): RawPointResult {
   const score = cloneSnapshot(match.score)
   const loser = other(winner)
+
+  // Handicap "owe": if the winner still owes points this game, one is paid off
+  // and the score does not otherwise advance. Skipped during a chase playoff,
+  // where a point resolves a chase directly.
+  if (!match.playoffActive && (score.owe?.[winner] ?? 0) > 0) {
+    score.owe![winner] -= 1
+    return { score, gameWon: false, setWon: null, matchWon: null, serving: match.serving }
+  }
+
   const wp = score.points[winner]
   const lp = score.points[loser]
   let gameWon = false
@@ -116,10 +154,11 @@ function applyRawPoint(match: Match, winner: Side): RawPointResult {
 
   const serving = match.serving
   let setWon: Side | null = null
-  let matchWon: Side | null = null
+  // There is no automatic match-over condition: the match runs until it is
+  // ended manually. Sets still accumulate, but no sets-to-win target closes it.
+  const matchWon: Side | null = null
 
   if (gameWon) {
-    score.points = { A: 0, B: 0 }
     score.games[winner] += 1
     // Real-tennis rule: serving does not alternate when a game is won.
     // The only thing that swaps serving (and ends) is a chase playoff.
@@ -129,10 +168,12 @@ function applyRawPoint(match: Match, winner: Side): RawPointResult {
       score.sets[setWon] += 1
       score.setHistory.push({ A: score.games.A, B: score.games.B })
       score.games = { A: 0, B: 0 }
-      if (score.sets[setWon] >= match.config.setsToWin) {
-        matchWon = setWon
-      }
     }
+
+    // Pre-load the next game's handicap concessions (game count resets each
+    // set, so the half/quarter cadence restarts too). Also clears points/owe.
+    const gameInSet = score.games.A + score.games.B + 1
+    applyGamePreload(score, match.handicap, gameInSet)
   }
 
   return { score, gameWon, setWon, matchWon, serving }
@@ -168,10 +209,14 @@ function sideAtGamePoint(score: ScoreSnapshot): Side | null {
 export function shouldTriggerChasePlayoff(match: Match): boolean {
   if (match.playoffActive) return false
   const n = match.pendingChases.length
+  // Two chases pending → always play them off. A single pending chase is played
+  // off as soon as the game could be decided on the next stroke — i.e. when a
+  // player is at game point — so the chase is never lost by the game ending
+  // first. (Real-tennis rule: one chase remaining and the winning of the next
+  // stroke would win the game or set.) This holds at any game point, not only
+  // set-deciding games.
   if (n >= 2) return true
-  if (n === 1 && isSetDecidingGame(match) && sideAtGamePoint(match.score) !== null) {
-    return true
-  }
+  if (n === 1 && sideAtGamePoint(match.score) !== null) return true
   return false
 }
 
@@ -299,7 +344,7 @@ function reduceUndo(match: Match): Match {
 
   let m: Match = {
     ...match,
-    score: emptySnapshot(),
+    score: startingSnapshot(match.handicap),
     serving: match.initialServing,
     servingEnd: match.initialServingEnd,
     pendingChases: [],

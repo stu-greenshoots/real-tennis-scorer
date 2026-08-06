@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import type { Action, Match, MatchConfig } from '../scoring/types'
+import type { Action, Match, MatchConfig, Side } from '../scoring/types'
 import { createMatch, isMatchOver, reduce } from '../scoring/engine'
 import { migrateMatch } from '../scoring/migrate'
 import { KEYS, load, remove, save } from '../lib/storage'
@@ -71,16 +71,32 @@ export const useMatchStore = defineStore('match', () => {
 
   const hasActiveMatch = computed(() => !!current.value && !current.value.endedAt)
 
-  function start(
-    players: { A: string; B: string },
-    config: MatchConfig,
-    avatars?: { A?: string; B?: string },
-    photos?: { A?: string; B?: string },
-  ): void {
-    const match = createMatch({ players, config })
+  function start(opts: {
+    players: { A: string; B: string }
+    config: MatchConfig
+    serving?: Side
+    avatars?: { A?: string; B?: string }
+    photos?: { A?: string; B?: string }
+    handicaps?: { A?: number; B?: number }
+    handicap?: { difference: number; receivingSide: Side }
+  }): void {
+    // The player chosen to serve first starts at the service end, so both the
+    // serving role and the starting end follow the setup ordering. The handicap
+    // is passed into createMatch so the first game's concessions are pre-loaded.
+    const serving = opts.serving ?? 'A'
+    const match = createMatch({
+      players: opts.players,
+      config: opts.config,
+      serving,
+      servingEnd: serving,
+      handicap: opts.handicap,
+    })
     let next: Match = match
-    if (avatars) next = { ...next, avatars }
-    if (photos && (photos.A || photos.B)) next = { ...next, photos }
+    if (opts.avatars) next = { ...next, avatars: opts.avatars }
+    if (opts.photos && (opts.photos.A || opts.photos.B)) next = { ...next, photos: opts.photos }
+    if (opts.handicaps && (opts.handicaps.A != null || opts.handicaps.B != null)) {
+      next = { ...next, handicaps: opts.handicaps }
+    }
     current.value = next
   }
 

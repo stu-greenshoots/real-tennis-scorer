@@ -32,3 +32,25 @@ export const OPPONENT_AVATARS: Avatar[] = [
   { id: 'opp-messy',     bg: '#c98c2a',         silhouette: 'messy-hair' },
   { id: 'opp-hooded',    bg: '#1a1410',         silhouette: 'hooded' },
 ]
+
+/** Every selectable character. Either player can be any of these. */
+export const ALL_AVATARS: Avatar[] = [PAUL, ...OPPONENT_AVATARS]
+
+const AVATAR_PLACEHOLDER: Avatar = {
+  id: 'opponent',
+  bg: 'var(--surface-sunken)',
+  silhouette: 'long-hair-beard',
+}
+
+/**
+ * Resolve a stored avatar id (and optional uploaded photo) to the props the
+ * Portrait component expects. Both players are symmetric — either can be any
+ * character — so lookups span the whole roster rather than assuming A = Paul.
+ */
+export function resolveAvatar(
+  id: string | null | undefined,
+  photo?: string,
+): { id: string; bg: string; silhouette: Silhouette; src?: string } {
+  const base = (id ? ALL_AVATARS.find((a) => a.id === id) : undefined) ?? AVATAR_PLACEHOLDER
+  return photo ? { ...base, src: photo } : base
+}

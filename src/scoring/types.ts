@@ -68,6 +68,11 @@ export interface ScoreSnapshot {
   games: { A: number; B: number }
   sets: { A: number; B: number }
   setHistory: Array<{ A: number; B: number }>
+  /**
+   * Handicap "owe" — fifteens still owed this game before a side's score can
+   * advance past love (0 = none). Present only for handicap matches.
+   */
+  owe?: { A: number; B: number }
 }
 
 export interface Chase {
@@ -88,9 +93,7 @@ export interface PointEvent {
 }
 
 export interface MatchConfig {
-  setsToWin: number
   gamesPerSet: number
-  tiebreak: boolean
   autoChase: boolean
 }
 
@@ -114,6 +117,14 @@ export interface Match {
   winner?: Side
   /** Optional avatar IDs (from src/lib/roster.ts) for visual personalisation. */
   avatars?: { A?: string; B?: string }
+  /** Player handicaps (real-tennis handicapping), to 1 decimal place. */
+  handicaps?: { A?: number; B?: number }
+  /**
+   * The agreed handicap odds actually being played — the whole-number
+   * difference (which may be adjusted away from the raw handicap difference)
+   * and which side receives (the other side owes). Absent when playing level.
+   */
+  handicap?: { difference: number; receivingSide: Side }
   /**
    * Optional uploaded photos (data URLs) for either player. When present these
    * take precedence over the avatar silhouette in the Portrait component.

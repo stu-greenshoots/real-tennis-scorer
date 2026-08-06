@@ -4,7 +4,7 @@ import type { PointEvent, GamePoints, Match } from '../scoring/types'
 import Portrait from './Portrait.vue'
 import GlyphDivider from './GlyphDivider.vue'
 import Glyphs from './Glyphs.vue'
-import { PAUL, OPPONENT_AVATARS } from '../lib/roster'
+import { resolveAvatar } from '../lib/roster'
 import { formatChase } from '../scoring/format'
 
 const props = defineProps<{
@@ -22,17 +22,8 @@ function tagLabel(tag?: string): string {
   return tag.replace(/-/g, ' ')
 }
 
-const avatarA = computed(() => {
-  const photo = props.match?.photos?.A
-  return photo ? { ...PAUL, src: photo } : PAUL
-})
-const avatarB = computed(() => {
-  const id = props.match?.avatars?.B
-  const base = OPPONENT_AVATARS.find((o) => o.id === id) ??
-    { id: 'opponent', bg: 'var(--accent)', silhouette: 'glasses' as const }
-  const photo = props.match?.photos?.B
-  return photo ? { ...base, src: photo } : base
-})
+const avatarA = computed(() => resolveAvatar(props.match?.avatars?.A, props.match?.photos?.A))
+const avatarB = computed(() => resolveAvatar(props.match?.avatars?.B, props.match?.photos?.B))
 
 interface Group {
   setIndex: number

@@ -5,7 +5,7 @@ import type { Side } from '../scoring/types'
 import { useMatchStore } from '../stores/match'
 import Portrait from '../components/Portrait.vue'
 import CourtBackdrop from '../components/CourtBackdrop.vue'
-import { PAUL, OPPONENT_AVATARS } from '../lib/roster'
+import { resolveAvatar } from '../lib/roster'
 import { formatChase } from '../scoring/format'
 
 const router = useRouter()
@@ -39,18 +39,12 @@ function awardChase(side: Side) {
 }
 
 
-function avatarB() {
-  const avId = match.value?.avatars?.B
-  const base = !avId
-    ? { id: 'opponent', bg: 'var(--accent)', silhouette: 'glasses' as const }
-    : OPPONENT_AVATARS.find((o) => o.id === avId) ?? OPPONENT_AVATARS[0]
-  const photo = match.value?.photos?.B
-  return photo ? { ...base, src: photo } : base
+function avatarA() {
+  return resolveAvatar(match.value?.avatars?.A, match.value?.photos?.A)
 }
 
-function avatarA() {
-  const photo = match.value?.photos?.A
-  return photo ? { ...PAUL, src: photo } : PAUL
+function avatarB() {
+  return resolveAvatar(match.value?.avatars?.B, match.value?.photos?.B)
 }
 </script>
 
