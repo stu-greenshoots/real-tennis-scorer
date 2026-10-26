@@ -273,7 +273,7 @@ function deuceLabel(): string | null {
   const m = match.value
   if (!m) return null
   const { A, B } = m.score.points
-  if (A === 40 && B === 40) return deucePointWins(m) ? 'deuce · next point wins' : 'deuce'
+  if (A === 40 && B === 40) return deucePointWins(m) ? 'game point' : 'deuce'
   if (A === 'AD') return `AD ${m.players.A}`
   if (B === 'AD') return `AD ${m.players.B}`
   return null

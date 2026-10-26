@@ -12,7 +12,7 @@ before 2026-10-26 were backfilled from git history and earlier notes.
   deuce only"** option on setup allows deuce → advantage → back to deuce,
   then the next point wins. It's tracked per game and resets each game. Undo
   restores it.
-- The scoring screen shows "deuce · next point wins" whenever the next point
+- The scoring screen shows "game point" whenever the next point
   decides the game. The point strip says "Deuce".
 - At a deuce where the next point wins, both players are at game point, so a
   single pending chase is played off there (same rule as any game point).
