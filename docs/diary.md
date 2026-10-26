@@ -4,6 +4,22 @@ A running log of decisions, rule clarifications and changes, newest first.
 Open questions live in [open-questions.md](open-questions.md). The entries
 before 2026-10-26 were backfilled from git history and earlier notes.
 
+## 2026-10-26: Deuce rules (from Paul)
+
+- **Handicap matches have no advantage.** At deuce (40–40), the next point
+  wins the game. This applies to any match played at a difference above 0.
+- **Level matches** play normal deuce and advantage by default. A new **"One
+  deuce only"** option on setup allows deuce → advantage → back to deuce,
+  then the next point wins. It's tracked per game and resets each game. Undo
+  restores it.
+- The scoring screen shows "deuce · next point wins" whenever the next point
+  decides the game. The point strip says "Deuce".
+- At a deuce where the next point wins, both players are at game point, so a
+  single pending chase is played off there (same rule as any game point).
+- **Auto-chase is always on.** The toggle was removed from setup, and its
+  space is now the one-deuce toggle (level) or a note about the handicap
+  deuce rule.
+
 ## 2026-10-26: Scoring feedback
 
 Stu and Paul picked from the options page

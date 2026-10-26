@@ -25,6 +25,7 @@ const cloneSnapshot = (s: ScoreSnapshot): ScoreSnapshot => ({
   sets: { A: s.sets.A, B: s.sets.B },
   setHistory: s.setHistory.map((h) => ({ A: h.A, B: h.B })),
   owe: { A: s.owe?.A ?? 0, B: s.owe?.B ?? 0 },
+  deuceReturned: s.deuceReturned ?? false,
 })
 
 const emptySnapshot = (): ScoreSnapshot => ({
@@ -50,6 +51,7 @@ function applyGamePreload(
 ): void {
   score.points = { A: 0, B: 0 }
   score.owe = { A: 0, B: 0 }
+  score.deuceReturned = false
   if (!handicap) return
   const rule = ruleForDifference(handicap.difference)
   if (!rule) return
@@ -143,9 +145,11 @@ function applyRawPoint(match: Match, winner: Side): RawPointResult {
   if (wp === 40 && (lp === 0 || lp === 15 || lp === 30)) {
     gameWon = true
   } else if (wp === 40 && lp === 40) {
-    score.points[winner] = 'AD'
+    if (deucePointWins(match, score)) gameWon = true
+    else score.points[winner] = 'AD'
   } else if (wp === 40 && lp === 'AD') {
     score.points[loser] = 40
+    score.deuceReturned = true
   } else if (wp === 'AD') {
     gameWon = true
   } else {
@@ -197,13 +201,25 @@ export function isSetDecidingGame(match: Match): boolean {
   return false
 }
 
-function sideAtGamePoint(score: ScoreSnapshot): Side | null {
-  const { A, B } = score.points
-  if (A === 'AD') return 'A'
-  if (B === 'AD') return 'B'
-  if (A === 40 && (B === 0 || B === 15 || B === 30)) return 'A'
-  if (B === 40 && (A === 0 || A === 15 || A === 30)) return 'B'
-  return null
+/**
+ * Whether the next point at deuce (40–40) wins the game outright instead of
+ * going to advantage. Handicap matches never play advantage; level matches do,
+ * unless the one-deuce option is on and the game has already been back to
+ * deuce once.
+ */
+export function deucePointWins(match: Match, score: ScoreSnapshot = match.score): boolean {
+  if (match.handicap) return true
+  return !!match.config.oneDeuce && !!score.deuceReturned
+}
+
+/** True when the next point could win the game for either side. */
+function isGamePoint(match: Match): boolean {
+  const { A, B } = match.score.points
+  if (A === 'AD' || B === 'AD') return true
+  if (A === 40 && B === 40) return deucePointWins(match)
+  if (A === 40 && (B === 0 || B === 15 || B === 30)) return true
+  if (B === 40 && (A === 0 || A === 15 || A === 30)) return true
+  return false
 }
 
 export function shouldTriggerChasePlayoff(match: Match): boolean {
@@ -216,7 +232,7 @@ export function shouldTriggerChasePlayoff(match: Match): boolean {
   // stroke would win the game or set.) This holds at any game point, not only
   // set-deciding games.
   if (n >= 2) return true
-  if (n === 1 && sideAtGamePoint(match.score) !== null) return true
+  if (n === 1 && isGamePoint(match)) return true
   return false
 }
 

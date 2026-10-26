@@ -26,7 +26,9 @@ const photos = reactive<Record<Side, string | undefined>>({ A: undefined, B: und
 const handicaps = reactive<Record<Side, string>>({ A: '', B: '' })
 
 const gamesPerSet = ref(6)
-const autoChase = ref(true)
+// Level matches only: after one return to deuce, the next point wins. Handicap
+// matches never play advantage. (Auto-chase is always on.)
+const oneDeuce = ref(false)
 
 const round1 = (n: number) => Math.round(n * 10) / 10
 function parseHandicap(raw: string): number | null {
@@ -190,7 +192,11 @@ function start() {
   if (!canStart.value) return
   matchStore.start({
     players: { A: displayName('A'), B: displayName('B') },
-    config: { gamesPerSet: gamesPerSet.value, autoChase: autoChase.value },
+    config: {
+      gamesPerSet: gamesPerSet.value,
+      autoChase: true,
+      oneDeuce: playingDiff.value === 0 ? oneDeuce.value : undefined,
+    },
     serving: serverSide.value,
     avatars: { A: avatarIds.A ?? undefined, B: avatarIds.B ?? undefined },
     photos: { A: photos.A, B: photos.B },
@@ -443,10 +449,15 @@ function start() {
           <NumberSegment label="Games / set" v-model="gamesPerSet" :options="[6, 9, 10]" />
         </div>
         <ToggleRow
-          v-model="autoChase"
-          label="Auto-chase mode"
-          sub="Engine handles end-switching for you"
+          v-if="playingDiff === 0"
+          v-model="oneDeuce"
+          label="One deuce only"
+          sub="Back to deuce after advantage? Next point wins"
         />
+        <div v-else class="deuce-note">
+          <Glyphs glyph="ball" :size="14" />
+          <span>Handicap match: no advantage. At deuce, the next point wins.</span>
+        </div>
       </div>
 
       <div class="cta-row">
@@ -826,6 +837,18 @@ function start() {
 }
 
 .settings { display: flex; flex-direction: column; gap: 0.6rem; }
+.deuce-note {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-3);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+.deuce-note svg { color: var(--accent); flex: 0 0 auto; }
 .settings-row { gap: 1rem; }
 .cta-row { padding-top: 0.5rem; }
 </style>

@@ -404,3 +404,94 @@ describe('handicap odds', () => {
     expect(m.score.owe).toEqual({ A: 0, B: 0 })
   })
 })
+
+describe('deuce rules', () => {
+  /** Play from 0-0 to deuce (40-40). */
+  function toDeuce(m: Match): Match {
+    for (let i = 0; i < 3; i++) {
+      m = award(m, 'A')
+      m = award(m, 'B')
+    }
+    return m
+  }
+
+  it('level match: deuce goes to advantage, and back to deuce, as normal', () => {
+    let m = toDeuce(newMatch())
+    expect(m.score.points).toEqual({ A: 40, B: 40 })
+    m = award(m, 'A')
+    expect(m.score.points.A).toBe('AD')
+    m = award(m, 'B') // back to deuce
+    expect(m.score.points).toEqual({ A: 40, B: 40 })
+    m = award(m, 'B')
+    expect(m.score.points.B).toBe('AD') // still advantage without one-deuce
+    expect(m.score.games).toEqual({ A: 0, B: 0 })
+  })
+
+  it('one deuce only: after one return to deuce, the next point wins', () => {
+    let m = toDeuce(newMatch({ oneDeuce: true }))
+    m = award(m, 'A') // advantage A
+    m = award(m, 'B') // back to deuce
+    expect(m.score.points).toEqual({ A: 40, B: 40 })
+    m = award(m, 'B') // next point wins
+    expect(m.score.games).toEqual({ A: 0, B: 1 })
+    expect(m.score.points).toEqual({ A: 0, B: 0 })
+  })
+
+  it('one deuce only still allows the first advantage', () => {
+    let m = toDeuce(newMatch({ oneDeuce: true }))
+    m = award(m, 'A')
+    expect(m.score.points.A).toBe('AD')
+    m = award(m, 'A')
+    expect(m.score.games.A).toBe(1)
+  })
+
+  it('one deuce only resets each game', () => {
+    let m = toDeuce(newMatch({ oneDeuce: true }))
+    m = award(m, 'A')
+    m = award(m, 'B')
+    m = award(m, 'A') // A wins game 1 on the deciding point
+    expect(m.score.games.A).toBe(1)
+    m = toDeuce(m)
+    m = award(m, 'B')
+    expect(m.score.points.B).toBe('AD') // fresh game: advantage again
+  })
+
+  it('handicap match: no advantage — the point at deuce wins the game', () => {
+    let m = createMatch({
+      players: { A: 'Paul', B: 'Other' },
+      config: { ...baseConfig },
+      serving: 'A',
+      servingEnd: 'A',
+      handicap: { difference: 3, receivingSide: 'A' }, // Rec half 15: nothing in game 1
+    })
+    m = toDeuce(m)
+    expect(m.score.points).toEqual({ A: 40, B: 40 })
+    m = award(m, 'B')
+    expect(m.score.games).toEqual({ A: 0, B: 1 })
+  })
+
+  it('undo after a deciding deuce point restores deuce and the one-deuce state', () => {
+    let m = toDeuce(newMatch({ oneDeuce: true }))
+    m = award(m, 'A')
+    m = award(m, 'B')
+    m = award(m, 'B') // wins on the deciding point
+    m = reduce(m, { type: 'undo' })
+    expect(m.score.points).toEqual({ A: 40, B: 40 })
+    m = award(m, 'A') // still the deciding point after undo
+    expect(m.score.games.A).toBe(1)
+  })
+
+  it('a single pending chase plays off at deuce only when the next point wins', () => {
+    const hcp = createMatch({
+      players: { A: 'Paul', B: 'Other' },
+      config: { ...baseConfig },
+      serving: 'A',
+      servingEnd: 'A',
+      handicap: { difference: 3, receivingSide: 'A' },
+    })
+    const lay = (m: Match) =>
+      reduce(toDeuce(m), { type: 'layChase', value: serviceExact('2'), laidBy: 'B' })
+    expect(lay(hcp).playoffActive).toBe(true) // sudden death: game point for both
+    expect(lay(newMatch()).playoffActive).toBe(false) // level: deuce isn't game point
+  })
+})

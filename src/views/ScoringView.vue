@@ -12,6 +12,7 @@ import type { PointTag, Side, ChaseValue, GamePoints, ChaseEnd } from '../scorin
 import { useMatchStore } from '../stores/match'
 import { resolveAvatar } from '../lib/roster'
 import { formatChase } from '../scoring/format'
+import { deucePointWins } from '../scoring/engine'
 import {
   concessionFifteensForGame,
   concessionLabel,
@@ -126,7 +127,9 @@ function score(side: Side, tag: PointTag) {
     showReceipt(`${label} to ${name} · Game`)
     burst(3)
   } else {
-    showReceipt(`${label} to ${name} · ${pointText(side)}–${pointText(otherOf(side))}`)
+    const p = after.score.points
+    const line = p.A === 40 && p.B === 40 ? 'Deuce' : `${pointText(side)}–${pointText(otherOf(side))}`
+    showReceipt(`${label} to ${name} · ${line}`)
     tick()
   }
 }
@@ -270,7 +273,7 @@ function deuceLabel(): string | null {
   const m = match.value
   if (!m) return null
   const { A, B } = m.score.points
-  if (A === 40 && B === 40) return 'deuce'
+  if (A === 40 && B === 40) return deucePointWins(m) ? 'deuce · next point wins' : 'deuce'
   if (A === 'AD') return `AD ${m.players.A}`
   if (B === 'AD') return `AD ${m.players.B}`
   return null

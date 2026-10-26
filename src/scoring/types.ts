@@ -73,6 +73,11 @@ export interface ScoreSnapshot {
    * advance past love (0 = none). Present only for handicap matches.
    */
   owe?: { A: number; B: number }
+  /**
+   * Set once this game has gone advantage and back to deuce. With the
+   * one-deuce option, the next deuce point then wins the game.
+   */
+  deuceReturned?: boolean
 }
 
 export interface Chase {
@@ -95,6 +100,11 @@ export interface PointEvent {
 export interface MatchConfig {
   gamesPerSet: number
   autoChase: boolean
+  /**
+   * Level matches only: after one return to deuce, the next point wins the
+   * game. Handicap matches never play advantage, whatever this says.
+   */
+  oneDeuce?: boolean
 }
 
 export interface Match {
