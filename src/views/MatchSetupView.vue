@@ -65,21 +65,37 @@ function displayName(side: Side): string {
 const otherSide = (side: Side): Side => (side === 'A' ? 'B' : 'A')
 
 // --- Agreed odds ------------------------------------------------------------
-// Players may agree to play at a different difference than the raw one. The
-// stepper defaults to the actual difference and the favoured (weaker) player,
-// but both can be overridden. Editing a handicap re-syncs to the new default.
+// Handicaps are optional: players who only know their difference can type or
+// step it in directly. When both handicaps are entered the stepper defaults to
+// the actual difference, and editing a handicap re-syncs to it; players may
+// still agree to play at a different difference.
+const MAX_DIFF = 60
 const playingDiff = ref(0)
-// Odds always favour the higher-handicap (weaker) player — not user-selectable.
-// A tie falls to the server side (only relevant if the difference is stepped up
-// from an equal-handicap starting point).
-const receivingSide = computed<Side>(() => favouredSide.value ?? serverSide.value)
+// Free-entry text for the difference, kept separate so typing isn't fought.
+const diffText = ref('0')
+function setPlayingDiff(n: number) {
+  playingDiff.value = Math.max(0, Math.min(MAX_DIFF, Math.round(n)))
+  diffText.value = String(playingDiff.value)
+}
+function onDiffInput() {
+  const t = diffText.value.trim()
+  if (/^\d+$/.test(t)) playingDiff.value = Math.min(MAX_DIFF, Number(t))
+  else if (t === '') playingDiff.value = 0
+}
+
+// With handicaps, odds always favour the higher-handicap (weaker) player — not
+// user-selectable. Without them (or when level), the players pick who receives.
+const chosenReceiver = ref<Side | null>(null)
+const receiverIsChosen = computed(() => favouredSide.value === null)
+const receivingSide = computed<Side | null>(() => favouredSide.value ?? chosenReceiver.value)
+const canStart = computed(() => playingDiff.value === 0 || receivingSide.value !== null)
 
 watch(handicapDiff, (d) => {
-  if (d !== null) playingDiff.value = d
+  if (d !== null) setPlayingDiff(d)
 })
 
 function stepDiff(delta: number) {
-  playingDiff.value = Math.max(0, Math.min(60, playingDiff.value + delta))
+  setPlayingDiff(playingDiff.value + delta)
 }
 
 const activeRule = computed(() =>
@@ -171,7 +187,7 @@ function onDragEnd() {
 }
 
 function start() {
-  if (!bothHandicaps.value) return // both handicaps are required
+  if (!canStart.value) return
   matchStore.start({
     players: { A: displayName('A'), B: displayName('B') },
     config: { gamesPerSet: gamesPerSet.value, autoChase: autoChase.value },
@@ -183,7 +199,7 @@ function start() {
       B: handicapValue('B') ?? undefined,
     },
     handicap:
-      playingDiff.value > 0
+      playingDiff.value > 0 && receivingSide.value
         ? { difference: playingDiff.value, receivingSide: receivingSide.value }
         : undefined,
   })
@@ -339,9 +355,12 @@ function start() {
       </div>
 
       <!-- Handicap odds -->
-      <div v-if="bothHandicaps" class="hcp-panel">
+      <div class="hcp-panel">
         <div class="hcp-top">
-          <span class="hcp-actual">Actual difference <strong>{{ handicapDiff }}</strong></span>
+          <span class="hcp-actual">
+            <template v-if="bothHandicaps">Actual difference <strong>{{ handicapDiff }}</strong></template>
+            <template v-else>Handicap difference</template>
+          </span>
           <div class="stepper" role="group" aria-label="Handicap difference to play at">
             <button
               type="button"
@@ -352,11 +371,20 @@ function start() {
             >
               −
             </button>
-            <span class="step-val">{{ playingDiff }}</span>
+            <input
+              class="step-val"
+              type="text"
+              inputmode="numeric"
+              v-model="diffText"
+              @input="onDiffInput"
+              @blur="setPlayingDiff(playingDiff)"
+              @focus="($event.target as HTMLInputElement).select()"
+              aria-label="Handicap difference"
+            />
             <button
               type="button"
               class="step-btn"
-              :disabled="playingDiff >= 60"
+              :disabled="playingDiff >= MAX_DIFF"
               @click="stepDiff(1)"
               aria-label="Raise difference"
             >
@@ -364,21 +392,41 @@ function start() {
             </button>
           </div>
         </div>
+        <div v-if="!bothHandicaps" class="hcp-hint muted">
+          Enter both handicaps, or just set the difference
+        </div>
 
         <div v-if="playingDiff === 0" class="hcp-level">
           <Glyphs glyph="ball" :size="15" /> Playing level — no odds
         </div>
         <template v-else-if="activeRule">
-          <div class="hcp-favour">
-            in favour of <strong>{{ displayName(receivingSide) }}</strong>
+          <div v-if="receiverIsChosen" class="receiver-pick" role="group" aria-label="Who receives the odds">
+            <span class="receiver-q">Who receives?</span>
+            <button
+              v-for="side in SIDES"
+              :key="side"
+              type="button"
+              class="receiver-opt"
+              :class="{ active: chosenReceiver === side }"
+              @click="chosenReceiver = side"
+            >
+              {{ displayName(side) }}
+            </button>
+          </div>
+          <div v-else class="hcp-favour">
+            in favour of <strong>{{ displayName(receivingSide!) }}</strong>
           </div>
           <div class="odds-grid">
             <div class="odds-row">
-              <span class="odds-who">{{ displayName(receivingSide) }} <em>receiving</em></span>
+              <span class="odds-who">
+                {{ receivingSide ? displayName(receivingSide) : '' }} <em>receiving</em>
+              </span>
               <span class="odds-val">{{ receiveLabel(activeRule.receive) }}</span>
             </div>
             <div class="odds-row">
-              <span class="odds-who">{{ displayName(otherSide(receivingSide)) }} <em>owing</em></span>
+              <span class="odds-who">
+                {{ receivingSide ? displayName(otherSide(receivingSide)) : '' }} <em>owing</em>
+              </span>
               <span class="odds-val">{{ oweLabel(activeRule.owe) }}</span>
             </div>
           </div>
@@ -387,9 +435,6 @@ function start() {
             <span>{{ activeRule.structural }}</span>
           </div>
         </template>
-      </div>
-      <div v-else class="hcp-summary">
-        <span class="muted">Enter both handicaps to see the odds</span>
       </div>
 
       <!-- Match settings -->
@@ -407,14 +452,14 @@ function start() {
       <div class="cta-row">
         <button
           class="btn btn-primary btn-lg btn-block"
-          :disabled="!bothHandicaps"
+          :disabled="!canStart"
           @click="start"
         >
           <Glyphs glyph="racquet" :size="18" />
           Start match
         </button>
-        <div v-if="!bothHandicaps" class="cta-hint muted">
-          Both players need a handicap to start
+        <div v-if="!canStart" class="cta-hint muted">
+          Choose who receives the odds to start
         </div>
       </div>
     </div>
@@ -583,21 +628,7 @@ function start() {
   border-radius: var(--radius-2);
 }
 .hcp-input:focus { border-color: var(--primary); outline: none; }
-.hcp-input.empty { border-style: dashed; border-color: var(--accent); }
-
-.hcp-summary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  min-height: 2.2rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: var(--radius-3);
-  background: var(--surface-raised);
-  border: 1px solid var(--line);
-  font-size: 0.9rem;
-  text-align: center;
-}
+.hcp-input.empty { border-style: dashed; }
 
 .hcp-panel {
   display: flex;
@@ -643,8 +674,13 @@ function start() {
   box-shadow: var(--shadow-1);
 }
 .step-btn:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
+.step-val:focus { outline: 1.5px solid var(--primary); border-radius: var(--radius-2); }
 .step-val {
-  min-width: 2.2rem;
+  width: 2.8rem;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   text-align: center;
   font-family: var(--font-num);
   font-size: 1.4rem;
@@ -669,15 +705,30 @@ function start() {
   font-size: 0.9rem;
 }
 .hcp-favour strong { color: var(--primary); }
-.swap-btn {
-  border: 1px solid var(--line-strong);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.7rem;
+.hcp-hint { font-size: 0.72rem; text-align: center; margin-top: -0.2rem; }
+.receiver-pick {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+.receiver-q { color: var(--text-muted); }
+.receiver-opt {
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.85rem;
   font-weight: 700;
-  padding: 0.15rem 0.5rem;
+  padding: 0.3rem 0.75rem;
   border-radius: var(--radius-pill);
   cursor: pointer;
+}
+.receiver-opt.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-contrast);
 }
 .odds-grid {
   display: flex;

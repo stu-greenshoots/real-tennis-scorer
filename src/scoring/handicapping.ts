@@ -5,7 +5,10 @@
  * handicap) *receives* a start each game, and the stronger player (lower
  * handicap) *owes* points each game.
  *
- * Transcribed from Paul's handicapping sheet.
+ * Transcribed from the T&RA singles odds calculator effective 1 August 2026
+ * ("New Singles" column). The structural notes (one serve, tambour, chase
+ * restrictions) follow Paul's sheet, since the published table only marks
+ * those rows with an unexplained * or ^ — see docs/open-questions.md.
  */
 
 /**
@@ -41,7 +44,8 @@ const P = (
 ): Concession => ({ kind: 'points', fifteens, cadence })
 
 // Structural handicaps stack in at higher differences. These are shown as a
-// reminder; the engine does not enforce them yet.
+// reminder; the engine does not enforce them yet. S_BASE matches the table's
+// "*" rows and the chase restrictions its "^" rows.
 const S_BASE = 'One serve only. Tambour banned.'
 const S_34 = `${S_BASE} Chases worse than 3 & 4 banned. No hazard chases when playing off. Service end conceded at one chase.`
 const S_42 = `${S_BASE} Chases worse than 3 banned. No hazard chases when playing off. Service end conceded at one chase.`
@@ -57,23 +61,26 @@ export const HANDICAP_RULES: HandicapRule[] = [
   { min: 7, max: 7, receive: P(1, 'half'), owe: P(1, 'full'), structural: null },
   { min: 8, max: 8, receive: P(1, 'full'), owe: P(1, 'half'), structural: null },
   { min: 9, max: 9, receive: P(1, 'half'), owe: P(2, 'half'), structural: null },
-  { min: 10, max: 10, receive: P(1, 'full'), owe: P(1, 'full'), structural: null },
-  { min: 11, max: 11, receive: P(1, 'half'), owe: P(2, 'full'), structural: null },
-  { min: 12, max: 12, receive: P(1, 'full'), owe: P(2, 'half'), structural: null },
-  { min: 13, max: 13, receive: P(1, 'full'), owe: P(2, 'full'), structural: null },
-  { min: 14, max: 14, receive: P(2, 'half'), owe: P(1, 'full'), structural: null },
-  { min: 15, max: 15, receive: P(2, 'half'), owe: P(2, 'half'), structural: null },
-  { min: 16, max: 17, receive: P(2, 'half'), owe: P(2, 'full'), structural: null },
-  { min: 18, max: 19, receive: P(2, 'full'), owe: P(1, 'full'), structural: null },
-  { min: 20, max: 21, receive: P(2, 'full'), owe: P(2, 'half'), structural: null },
-  { min: 22, max: 23, receive: P(2, 'full'), owe: P(2, 'full'), structural: null },
-  { min: 24, max: 25, receive: P(2, 'full'), owe: P(3, 'full'), structural: null },
-  { min: 26, max: 27, receive: P(2, 'full'), owe: P(1, 'full'), structural: S_BASE },
-  { min: 28, max: 29, receive: P(2, 'full'), owe: P(2, 'half'), structural: S_BASE },
-  { min: 30, max: 31, receive: P(2, 'full'), owe: P(2, 'full'), structural: S_BASE },
-  { min: 32, max: 33, receive: P(2, 'full'), owe: P(3, 'full'), structural: S_BASE },
-  { min: 34, max: 35, receive: P(2, 'full'), owe: P(1, 'full'), structural: S_34 },
+  { min: 10, max: 11, receive: P(1, 'full'), owe: P(1, 'full'), structural: null },
+  { min: 12, max: 12, receive: P(1, 'half'), owe: P(2, 'full'), structural: null },
+  { min: 13, max: 13, receive: P(1, 'full'), owe: P(2, 'half'), structural: null },
+  { min: 14, max: 14, receive: P(1, 'full'), owe: P(2, 'full'), structural: null },
+  { min: 15, max: 15, receive: P(2, 'half'), owe: P(1, 'full'), structural: null },
+  { min: 16, max: 17, receive: P(2, 'half'), owe: P(2, 'half'), structural: null },
+  { min: 18, max: 19, receive: P(2, 'half'), owe: P(2, 'full'), structural: null },
+  { min: 20, max: 21, receive: P(2, 'full'), owe: P(1, 'full'), structural: null },
+  { min: 22, max: 23, receive: P(2, 'full'), owe: P(2, 'half'), structural: null },
+  { min: 24, max: 25, receive: P(2, 'full'), owe: P(2, 'full'), structural: null },
+  { min: 26, max: 27, receive: P(2, 'full'), owe: P(3, 'full'), structural: null },
+  { min: 28, max: 29, receive: P(2, 'full'), owe: P(1, 'full'), structural: S_BASE },
+  { min: 30, max: 31, receive: P(2, 'full'), owe: P(2, 'half'), structural: S_BASE },
+  { min: 32, max: 33, receive: P(2, 'full'), owe: P(2, 'full'), structural: S_BASE },
+  { min: 34, max: 35, receive: P(2, 'full'), owe: P(3, 'full'), structural: S_BASE },
+  // Rec 30 / Owe 15 with chases worse than 3 & 4 banned was abolished in 2026.
   { min: 36, max: 37, receive: P(2, 'full'), owe: P(2, 'half'), structural: S_34 },
+  // The published table prints 37/38 and 47/48 for the next "Owe 30" rows,
+  // overlapping the rows above. Read as 38/39 and 48/49 (unchanged from the
+  // previous table), confirmed with Paul.
   { min: 38, max: 39, receive: P(2, 'full'), owe: P(2, 'full'), structural: S_34 },
   { min: 40, max: 41, receive: P(2, 'full'), owe: P(3, 'full'), structural: S_34 },
   { min: 42, max: 43, receive: P(2, 'full'), owe: P(2, 'full'), structural: S_42 },

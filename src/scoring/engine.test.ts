@@ -340,14 +340,14 @@ describe('handicap odds', () => {
     expect(m.score.owe).toEqual({ A: 0, B: 0 })
   })
 
-  it('pre-loads receiver ahead and ower behind (diff 24 = Rec 30 / Owe 40)', () => {
-    const m = hcpMatch(24, 'A')
+  it('pre-loads receiver ahead and ower behind (diff 26 = Rec 30 / Owe 40)', () => {
+    const m = hcpMatch(26, 'A')
     expect(m.score.points).toEqual({ A: 30, B: 0 })
     expect(m.score.owe).toEqual({ A: 0, B: 3 })
   })
 
   it('paying off owed points does not advance the score until the debt clears', () => {
-    let m = hcpMatch(24, 'A') // B owes 40 (3 fifteens)
+    let m = hcpMatch(26, 'A') // B owes 40 (3 fifteens)
     m = award(m, 'B')
     expect(m.score.owe).toEqual({ A: 0, B: 2 })
     expect(m.score.points.B).toBe(0)
@@ -361,7 +361,7 @@ describe('handicap odds', () => {
   })
 
   it('a receiver starting at 30 wins the game in two points', () => {
-    let m = hcpMatch(22, 'A') // Rec 30 / Owe 30
+    let m = hcpMatch(24, 'A') // Rec 30 / Owe 30
     expect(m.score.points.A).toBe(30)
     m = award(m, 'A') // 40
     m = award(m, 'A') // game
