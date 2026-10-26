@@ -93,6 +93,8 @@ export interface PointEvent {
   tag?: PointTag
   chaseLaid?: ChaseValue
   endsSwitchedAfter?: boolean
+  /** A play-off chase called off (unclear who won it): resolved, no score. */
+  chaseOff?: boolean
   scoreAfter: ScoreSnapshot
   note?: string
 }
@@ -146,5 +148,6 @@ export type Action =
   | { type: 'awardPoint'; side: Side; tag?: PointTag }
   | { type: 'layChase'; value: ChaseValue; laidBy: Side }
   | { type: 'startChasePlayoff' }
+  | { type: 'chaseOff' }
   | { type: 'undo' }
   | { type: 'finish' }

@@ -302,6 +302,32 @@ function reduceAwardPoint(match: Match, side: Side, tag?: PointTag): Match {
   return next
 }
 
+/**
+ * "Chase off": during a play-off, when it isn't clear who won the chase, the
+ * chase is resolved with no change to the score.
+ */
+function reduceChaseOff(match: Match): Match {
+  if (match.winner || !match.playoffActive) return match
+  const ev = makeEvent({
+    winner: null,
+    chaseOff: true,
+    scoreAfter: cloneSnapshot(match.score),
+    note: 'chase off — no score',
+  })
+  return { ...resolvePlayoffChase(match), events: [...match.events, ev] }
+}
+
+/** Drop the chase being played off; the play-off ends when none remain. */
+function resolvePlayoffChase(match: Match): Match {
+  const remaining = match.playoffRemaining - 1
+  return {
+    ...match,
+    pendingChases: match.pendingChases.slice(1),
+    playoffActive: remaining > 0,
+    playoffRemaining: Math.max(0, remaining),
+  }
+}
+
 function reduceLayChase(match: Match, value: ChaseValue, laidBy: Side): Match {
   if (match.winner) return match
   const chase: Chase = { value, laidBy, scoreAtLay: cloneSnapshot(match.score) }
@@ -406,6 +432,10 @@ function replayEvent(match: Match, ev: PointEvent): Match {
       events: [...match.events, ev],
     }
   }
+  // Chase off during a playoff: resolved with no score
+  if (ev.chaseOff) {
+    return { ...resolvePlayoffChase(match), events: [...match.events, ev] }
+  }
   // Awarded point (chase-won during playoff or normal)
   if (ev.winner) {
     if (match.playoffActive) {
@@ -456,6 +486,8 @@ export function reduce(match: Match, action: Action): Match {
     case 'startChasePlayoff':
       if (match.playoffActive || match.pendingChases.length === 0) return match
       return startPlayoff(match)
+    case 'chaseOff':
+      return reduceChaseOff(match)
     case 'undo':
       return reduceUndo(match)
     case 'finish':

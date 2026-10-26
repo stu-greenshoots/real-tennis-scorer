@@ -62,6 +62,7 @@ function tagBadge(ev: PointEvent): string {
   if (ev.chaseLaid) return formatChase(ev.chaseLaid)
   if (ev.tag) return tagLabel(ev.tag)
   if (ev.endsSwitchedAfter) return 'Ends switched'
+  if (ev.chaseOff) return 'Chase off'
   if (ev.note) return ev.note
   return ''
 }

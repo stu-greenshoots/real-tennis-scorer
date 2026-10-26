@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import MatchTimer from '../components/MatchTimer.vue'
 import ChaseLinePicker from '../components/ChaseLinePicker.vue'
@@ -98,6 +98,7 @@ const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
 function score(side: Side, tag: PointTag) {
   const m = match.value
   if (!m) return
+  const wasPlayoff = m.playoffActive
   const before = {
     games: m.score.games.A + m.score.games.B,
     sets: m.score.sets.A + m.score.sets.B,
@@ -132,7 +133,53 @@ function score(side: Side, tag: PointTag) {
     showReceipt(`${label} to ${name} · ${line}`)
     tick()
   }
+  noteIfPlayoffOver(wasPlayoff)
 }
+
+// --- Chase play-off -----------------------------------------------------------
+// Play-off mode: a slate strip with progress through the chases being played
+// off. The tiles slide past each other when the ends change.
+
+/** Progress through the current play-off, derived from the event log. */
+const playoffProgress = computed(() => {
+  const m = match.value
+  if (!m?.playoffActive || m.pendingChases.length === 0) return null
+  let start = -1
+  for (let i = m.events.length - 1; i >= 0; i--) {
+    if (m.events[i].endsSwitchedAfter) {
+      start = i
+      break
+    }
+  }
+  const played = m.events.slice(start + 1).filter((e) => e.winner || e.chaseOff).length
+  return { played, total: played + m.playoffRemaining, current: m.pendingChases[0].value }
+})
+
+/** "Chases played" once the last chase of a play-off is decided. */
+function noteIfPlayoffOver(wasPlayoff: boolean) {
+  const m = match.value
+  if (!m || !wasPlayoff || m.playoffActive) return
+  showReceipt(`Chases played · ${m.players[m.serving]} serving`)
+}
+
+/** Unclear who won the chase: resolve it with no change to the score. */
+function chaseOff() {
+  const m = match.value
+  if (!m?.playoffActive) return
+  matchStore.dispatch({ type: 'chaseOff' })
+  showReceipt('Chase off · no score')
+  tick()
+  noteIfPlayoffOver(true)
+}
+
+/** Bumps when the ends change, to replay the turning-arrow animation. */
+const swapN = ref(0)
+watch(
+  () => match.value?.servingEnd,
+  (now, was) => {
+    if (now && was && now !== was) swapN.value++
+  },
+)
 
 function award(side: Side, tag: PointTag) {
   score(side, tag)
@@ -290,7 +337,7 @@ function isServer(side: Side): boolean {
 </script>
 
 <template>
-  <div v-if="match" class="view scoring-view">
+  <div v-if="match" class="view scoring-view" :class="{ 'playoff-mode': match.playoffActive }">
     <CourtBackdrop :opacity="0.05" />
     <div class="scoring-content">
       <div class="top-bar">
@@ -330,18 +377,21 @@ function isServer(side: Side): boolean {
         </div>
       </div>
 
-      <div v-if="match.playoffActive && match.pendingChases.length > 0" class="banner chase-banner">
-        <div class="banner-head">
-          <Glyphs glyph="penthouse" :size="16" />
-          Playing off chases — switch ends!
+      <div v-if="playoffProgress" class="playoff-strip" role="status">
+        <div class="ps-top">
+          <span class="ps-title">Playing off</span>
+          <span class="ps-dots" aria-hidden="true">
+            <i
+              v-for="i in playoffProgress.total"
+              :key="i"
+              :class="{ done: i - 1 < playoffProgress.played, cur: i - 1 === playoffProgress.played }"
+            />
+          </span>
         </div>
-        <ul class="chase-list">
-          <li v-for="(c, i) in match.pendingChases" :key="i">{{ formatChase(c.value) }}</li>
-        </ul>
-      </div>
-      <div v-else-if="match.playoffActive" class="banner">
-        <Glyphs glyph="penthouse" :size="16" />
-        Playing off chases — switch ends!
+        <div class="ps-chase">
+          Chase {{ playoffProgress.played + 1 }} of {{ playoffProgress.total }} ·
+          {{ formatChase(playoffProgress.current) }}
+        </div>
       </div>
       <div v-else-if="match.pendingChases.length > 0" class="banner chase-banner chase-banner-compact">
         <Glyphs glyph="penthouse" :size="16" />
@@ -349,7 +399,11 @@ function isServer(side: Side): boolean {
         <span class="chase-inline">{{ match.pendingChases.map((c) => formatChase(c.value)).join(' · ') }}</span>
       </div>
 
-      <div class="tiles">
+      <div class="tiles-wrap">
+      <span v-if="swapN > 0" :key="`swap-${swapN}`" class="swap-arrows" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v14M7 18l-3-3M7 18l3-3M17 20V6M17 6l-3 3M17 6l3 3" /></svg>
+      </span>
+      <TransitionGroup tag="div" name="swap" class="tiles">
         <section
           v-for="side in [topSide, bottomSide]"
           :key="side"
@@ -407,7 +461,12 @@ function isServer(side: Side): boolean {
             </div>
           </div>
         </section>
+      </TransitionGroup>
       </div>
+
+      <button v-if="match.playoffActive" class="btn chase-off-btn" @click="chaseOff">
+        Chase off · no score
+      </button>
 
       <div class="action-row">
         <button class="btn btn-small" @click="undo">↶ Undo</button>
@@ -415,7 +474,7 @@ function isServer(side: Side): boolean {
       </div>
     </div>
 
-    <div v-if="receipt" class="receipt" role="status">
+    <div v-if="receipt" class="receipt" :class="{ raised: match.playoffActive }" role="status">
       <span>{{ receipt }}</span>
       <button type="button" class="receipt-undo" @click="undo">Undo</button>
     </div>
@@ -553,11 +612,69 @@ function isServer(side: Side): boolean {
 .stat .dot { color: var(--text-faint); margin: 0 0.3rem; }
 .stat.divider { border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
 
+.tiles-wrap {
+  position: relative;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
 .tiles {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   flex: 1 0 auto;
+}
+/* Ends change: tiles slide past each other (TransitionGroup FLIP). */
+.tile.swap-move { transition: transform 0.9s cubic-bezier(0.5, 0, 0.2, 1); }
+.swap-arrows {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 5;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--text);
+  box-shadow: var(--shadow-3);
+  pointer-events: none;
+  opacity: 0;
+  animation: swap-arrows 1.3s ease forwards;
+}
+@keyframes swap-arrows {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6) rotate(0); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
+  75% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(180deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8) rotate(180deg); }
+}
+
+/* Play-off mode: darker ground and a slate progress strip. */
+.scoring-view { transition: background 0.4s; }
+.scoring-view.playoff-mode { background: #e2d7c4; }
+.playoff-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--radius-3);
+  background: var(--slate);
+  color: #f1ece2;
+}
+.ps-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.ps-title { font-family: var(--font-display); font-size: 1.5rem; line-height: 1; }
+.ps-dots { display: flex; gap: 0.35rem; }
+.ps-dots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(241, 236, 226, 0.3); }
+.ps-dots i.done { background: var(--accent-soft); }
+.ps-dots i.cur { background: #f1ece2; box-shadow: 0 0 0 2px rgba(241, 236, 226, 0.35); }
+.ps-chase { font-size: 0.85rem; font-weight: 600; color: rgba(241, 236, 226, 0.88); }
+.chase-off-btn {
+  width: 100%;
+  height: 44px;
+  background: var(--slate);
+  color: #f1ece2;
+  border-color: transparent;
 }
 .tile {
   display: flex;
@@ -778,6 +895,8 @@ function isServer(side: Side): boolean {
   font-weight: 600;
   animation: rise 0.25s var(--ease-spring);
 }
+/* Sit above the Chase off button during a play-off. */
+.receipt.raised { bottom: calc(env(safe-area-inset-bottom) + 108px); }
 .receipt span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .receipt-undo {
   flex: 0 0 auto;
@@ -856,6 +975,7 @@ function isServer(side: Side): boolean {
 .final-actions { display: flex; gap: 0.5rem; width: 100%; margin-top: 1rem; }
 
 @media (prefers-reduced-motion: reduce) {
+  .swap-move, .swap-arrows,
   .tile-glow, .tile-score.pop, .stat-val.bump, .receipt, .game-banner, .set-card { animation: none; }
 }
 

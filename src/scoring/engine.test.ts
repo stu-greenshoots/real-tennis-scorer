@@ -495,3 +495,57 @@ describe('deuce rules', () => {
     expect(lay(newMatch()).playoffActive).toBe(false) // level: deuce isn't game point
   })
 })
+
+describe('chase off', () => {
+  function inPlayoff(): Match {
+    let m = newMatch()
+    m = award(m, 'A') // 15-0
+    m = reduce(m, { type: 'layChase', value: serviceExact('2'), laidBy: 'B' })
+    m = reduce(m, { type: 'layChase', value: serviceExact('4'), laidBy: 'A' })
+    expect(m.playoffActive).toBe(true)
+    return m
+  }
+
+  it('resolves the current chase without changing the score', () => {
+    let m = inPlayoff()
+    const before = m.score
+    m = reduce(m, { type: 'chaseOff' })
+    expect(m.score.points).toEqual(before.points)
+    expect(m.pendingChases).toHaveLength(1)
+    expect(m.playoffActive).toBe(true)
+    expect(m.playoffRemaining).toBe(1)
+  })
+
+  it('ends the play-off when the last chase is called off', () => {
+    let m = inPlayoff()
+    m = reduce(m, { type: 'chaseOff' })
+    m = award(m, 'B') // second chase won by B
+    expect(m.playoffActive).toBe(false)
+    expect(m.pendingChases).toHaveLength(0)
+    expect(m.score.points).toEqual({ A: 15, B: 15 })
+  })
+
+  it('does nothing outside a play-off', () => {
+    const m = newMatch()
+    expect(reduce(m, { type: 'chaseOff' })).toBe(m)
+  })
+
+  it('undo restores the called-off chase', () => {
+    let m = inPlayoff()
+    m = reduce(m, { type: 'chaseOff' })
+    m = reduce(m, { type: 'undo' })
+    expect(m.pendingChases).toHaveLength(2)
+    expect(m.playoffRemaining).toBe(2)
+    expect(m.playoffActive).toBe(true)
+  })
+
+  it('replays through undo of a later event', () => {
+    let m = inPlayoff()
+    m = reduce(m, { type: 'chaseOff' })
+    m = award(m, 'A')
+    m = reduce(m, { type: 'undo' }) // undo the award; chase off stays
+    expect(m.pendingChases).toHaveLength(1)
+    expect(m.playoffRemaining).toBe(1)
+    expect(m.score.points).toEqual({ A: 15, B: 0 })
+  })
+})

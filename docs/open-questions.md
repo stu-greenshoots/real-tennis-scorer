@@ -36,3 +36,22 @@ structural handicaps, so a wrong guess only changes the text shown at setup.
 handicapper.
 
 Source: <https://www.tennisandrackets.com/news/real-tennis-handicap-tables-to-change-for-first-time-in-24-years>
+
+## Scoring from a smart watch
+
+**Raised:** 2026-10-26 · **Status:** later, needs proper thought
+
+For now we assume someone holds the phone and keeps score. Later we'd like
+players to score from a smart watch. Things to work out first: which watches
+(Apple Watch needs a native app, since a web app can't run on it), how a
+player taps a point mid-rally without fuss, how the watch and phone stay in
+sync, and whether the watch shows the score, the call, or both.
+
+## Who has to beat each chase in a play-off
+
+**Raised:** 2026-10-26 · **Status:** open (not built)
+
+The change-of-ends options page said "Paul to beat 2 yards" for each chase.
+We didn't build that screen, but if we show "who has to beat it" anywhere,
+Paul should confirm the wording and who it applies to for service-end and
+hazard-end chases.

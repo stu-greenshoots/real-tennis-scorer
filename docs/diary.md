@@ -4,6 +4,29 @@ A running log of decisions, rule clarifications and changes, newest first.
 Open questions live in [open-questions.md](open-questions.md). The entries
 before 2026-10-26 were backfilled from git history and earlier notes.
 
+## 2026-10-26: Change of ends and Chase off
+
+Stu and Paul picked from the options page
+(https://claude.ai/artifact/BKYsjxqHzbBPPtiezSM7SA).
+
+- **Chase off (rule from Paul):** during a play-off, if it isn't clear who
+  won the chase, tap **Chase off · no score** at the bottom. The chase is
+  resolved and the score doesn't change. It's a new `chaseOff` action in the
+  engine, replayed correctly by Undo, and shows as "Chase off" in the
+  timeline.
+- **Play-off mode:** while chases are played off, the screen darkens and a
+  slate strip shows "Playing off · Chase 1 of 2 · Chase 2 yards" with
+  progress dots. This replaces the red "switch ends!" strip.
+- **Tiles slide past each other** when the ends change (and back on Undo),
+  with a turning arrow between them.
+- **"Chases played · Stu serving"** appears when the last chase is decided
+  (Paul's wording, rather than "played off").
+- **Not built (decided against):** full-screen change-of-ends card, end
+  labels on tiles, long haptic buzz.
+- **Assumption:** someone is holding the phone and doing the scoring, so the
+  screen doesn't need to flip to match where players stand. Smart watches
+  are a later idea (see open questions).
+
 ## 2026-10-26: Deuce rules (from Paul)
 
 - **Handicap matches have no advantage.** At deuce (40–40), the next point
