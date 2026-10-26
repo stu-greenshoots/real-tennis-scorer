@@ -172,16 +172,16 @@ function confirm() {
   grid-template-columns: repeat(4, 1fr);
   gap: 0.25rem;
 }
-.mod-btn { font-size: 0.68rem; min-height: 32px; padding: 0.2rem 0.2rem; }
+.mod-btn { font-size: 0.72rem; height: 34px; padding: 0 0.2rem; }
 .lines {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.3rem;
   min-height: 0;
   overflow: auto;
   align-content: start;
 }
-.line-btn { font-size: 0.82rem; padding: 0.2rem 0.4rem; }
+.line-btn { font-size: 0.8rem; height: 40px; padding: 0 0.3rem; line-height: 1.1; }
 .line-btn.dim { opacity: 0.35; }
 .preview {
   text-align: center;
@@ -197,4 +197,5 @@ function confirm() {
   display: flex;
   gap: 0.4rem;
 }
+.action-row .btn { height: 44px; }
 </style>

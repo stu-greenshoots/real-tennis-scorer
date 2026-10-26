@@ -286,7 +286,7 @@ function start() {
                 :placeholder="side === 'A' ? 'Player 1 name' : 'Player 2 name'"
               />
               <div class="hint">
-                {{ isServer(side) ? 'Serves first · service end' : 'Tap the image to pick a character' }}
+                Tap the picture to change it
               </div>
             </div>
             <label class="hcp-field">
@@ -565,19 +565,20 @@ function start() {
 }
 .portrait-edit {
   position: absolute;
-  right: -4px;
-  bottom: -4px;
-  width: 20px;
-  height: 20px;
+  right: -6px;
+  bottom: -6px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  background: var(--primary);
-  color: var(--primary-contrast);
+  background: var(--surface-raised);
+  color: var(--primary);
+  border: 2px solid var(--primary);
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: var(--shadow-1);
 }
-.portrait-btn.open .portrait-edit { background: var(--accent); }
+.portrait-btn.open .portrait-edit { background: var(--accent); color: var(--text); border-color: var(--accent); }
 
 .player-name {
   flex: 1;
@@ -719,6 +720,7 @@ function start() {
   border: 1.5px solid var(--line-strong);
   background: var(--surface);
   color: var(--text);
+  font-family: var(--font-body);
   font-size: 0.85rem;
   font-weight: 700;
   padding: 0.3rem 0.75rem;

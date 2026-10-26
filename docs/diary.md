@@ -4,6 +4,55 @@ A running log of decisions, rule clarifications and changes, newest first.
 Open questions live in [open-questions.md](open-questions.md). The entries
 before 2026-10-26 were backfilled from git history and earlier notes.
 
+## 2026-10-26: Scoring feedback
+
+Stu and Paul picked from the options page
+(https://claude.ai/artifact/QPJt68QAdpmgSDC5yWAY6R).
+
+- **Built:**
+  - Every point: score pop and tile glow, a point receipt with Undo ("Stroke
+    to Paul · 30–0"), and a haptic tick. Chase laid also gets a receipt and a
+    tick.
+  - Every game: a "Game, Paul · Paul leads five games to four" banner for
+    about 2 seconds, plus the games-counter bump.
+  - Every set: a card that stays until tapped ("Set to Paul · 6–4 · sets
+    2–0").
+  - Ending the match: a result screen ("Paul takes it! · Two sets to love")
+    with **green** real tennis balls falling (Paul asked for green, like
+    real felt balls). It used to go straight home.
+- **Not built (decided against):** written marker's call, spoken call, sound
+  tick.
+- **Haptics on iPhone:** Safari has no vibration API. We use the iOS 18+
+  workaround: toggling a hidden native switch (`<input type="checkbox"
+  switch>`) plays a system haptic tick. Android uses `navigator.vibrate`.
+  This isn't an official API, so Apple could stop it. If they do, the tick
+  just stops. See `src/lib/haptics.ts`.
+- The match has no automatic winner (it's ended manually), so the "match
+  won" moment happens when End match is tapped. The winner is whoever leads
+  on sets, then on games in the current set. If level: "Honours even".
+
+## 2026-10-26: iPhone layout fixes (from Paul's iPhone 16 Pro screenshots)
+
+- **Chase picker cut off under Safari's toolbar.** The scoring screen grew
+  past the visible screen when the picker opened. It's now fixed to the
+  visible viewport (`100dvh`, which follows Safari's toolbars) and scrolls if
+  it ever overflows. The chase lines use 3 columns, so the picker is about
+  half as tall.
+- **Buttons clipped when the handicap strip and chase banner were showing.**
+  Tiles used to clip their buttons. Now buttons shrink to a 48px minimum and
+  tiles never cut them off. The pending-chase banner is a single line, and
+  the player pictures are a bit smaller.
+- **Edit badge on the picture was invisible** against a dark portrait. It's
+  now a light badge with a dark ring, and both cards say "Tap the picture to
+  change it".
+- **"Player 2 owes nothing"** on a quarter-15 handicap looked wrong. The
+  strip now names the odds and what they come to this game: "owes quarter
+  15 (nothing this game)". Love concessions aren't shown.
+- Checked at 402×660 and 402×600 (iPhone 16 Pro with Safari toolbars) in
+  Chrome. Not yet checked on a real iPhone.
+- Next: feedback when points, games, sets and matches are won. Options are in
+  the "Scoring feedback" artifact.
+
 ## 2026-10-26: Handicap tables updated to the 2026 T&RA odds
 
 - On 30 June 2026 the T&RA (IHSC) announced the first change to the
